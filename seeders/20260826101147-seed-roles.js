@@ -25,7 +25,11 @@ module.exports = {
 
     async down(queryInterface) {
         await queryInterface.bulkDelete("roles", {
-            name: ["user", "vendor", "superadmin"]
+            name: [
+                "user",
+                "vendor",
+                "superadmin"
+            ]
         });
     }
 };

@@ -24,6 +24,7 @@ const User = sequelize.define(
             type: DataTypes.STRING(255),
             allowNull: false,
             unique: true,
+
             validate: {
                 isEmail: true
             }
@@ -31,11 +32,6 @@ const User = sequelize.define(
 
         password: {
             type: DataTypes.STRING(255),
-            allowNull: false
-        },
-
-        roleId: {
-            type: DataTypes.INTEGER,
             allowNull: false
         },
 
@@ -50,24 +46,31 @@ const User = sequelize.define(
             allowNull: true
         },
 
-        // Shared OTP
-        // Used for:
-        // - Email verification
-        // - Forgot password
+        // =================================================
+        // SHARED OTP
+        // =================================================
         //
-        // OTP is stored directly in the database.
+        // Used for:
+        // - email verification
+        // - forgot password
+        //
+        // OTP is stored directly.
+        //
+
         otp: {
             type: DataTypes.STRING(6),
             allowNull: true
         },
 
-        // Expiry time for the current OTP
         otpExpiry: {
             type: DataTypes.DATE,
             allowNull: true
         },
 
-        // Used to invalidate previously issued password reset tokens
+        // =================================================
+        // PASSWORD RESET TOKEN VERSION
+        // =================================================
+
         passwordResetVersion: {
             type: DataTypes.INTEGER,
             allowNull: false,
