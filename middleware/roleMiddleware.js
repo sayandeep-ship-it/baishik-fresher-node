@@ -7,10 +7,31 @@ const {
 // =====================================================
 // GENERIC ROLE AUTHORIZATION
 // =====================================================
+//
+// Checks the user_roles junction table.
+//
+// Only a role assignment with:
+//
+// suspended = false
+//
+// is considered active.
+//
+// =====================================================
 
-const authorizeRoles = (...allowedRoles) => {
-    return async (req, res, next) => {
+const authorizeRoles = (
+    ...allowedRoles
+) => {
+    return async (
+        req,
+        res,
+        next
+    ) => {
         try {
+
+            // =============================================
+            // AUTHENTICATION CHECK
+            // =============================================
+
             if (!req.user) {
                 return res.status(401).json({
                     message:
@@ -18,19 +39,32 @@ const authorizeRoles = (...allowedRoles) => {
                 });
             }
 
+
+            // =============================================
+            // FIND ACTIVE ROLE ASSIGNMENT
+            // =============================================
+
             const assignment =
                 await UserRole.findOne({
                     where: {
-                        userId: req.user.id
+                        userId:
+                            req.user.id,
+
+                        suspended:
+                            false
                     },
 
                     include: [
                         {
-                            model: Role,
-                            as: "role",
+                            model:
+                                Role,
+
+                            as:
+                                "role",
 
                             where: {
-                                name: allowedRoles
+                                name:
+                                    allowedRoles
                             },
 
                             attributes: [
@@ -41,16 +75,79 @@ const authorizeRoles = (...allowedRoles) => {
                     ]
                 });
 
+
+            // =============================================
+            // NO ACTIVE ROLE
+            // =============================================
+
             if (!assignment) {
+
+                // -----------------------------------------
+                // Check whether the user has the role
+                // but it is suspended.
+                // -----------------------------------------
+
+                const suspendedAssignment =
+                    await UserRole.findOne({
+                        where: {
+                            userId:
+                                req.user.id,
+
+                            suspended:
+                                true
+                        },
+
+                        include: [
+                            {
+                                model:
+                                    Role,
+
+                                as:
+                                    "role",
+
+                                where: {
+                                    name:
+                                        allowedRoles
+                                },
+
+                                attributes: [
+                                    "id",
+                                    "name"
+                                ]
+                            }
+                        ]
+                    });
+
+
+                if (
+                    suspendedAssignment
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Your role is suspended."
+                    });
+                }
+
+
                 return res.status(403).json({
                     message:
                         "You do not have permission to access this resource."
                 });
             }
 
+
+            // =============================================
+            // AUTHORIZED
+            // =============================================
+
+            req.authorizedRole =
+                assignment.role.name;
+
+
             next();
 
         } catch (error) {
+
             console.error(
                 "Role authorization error:",
                 error
@@ -66,21 +163,55 @@ const authorizeRoles = (...allowedRoles) => {
 
 
 // =====================================================
-// USER ACCESS
+// USER
 // =====================================================
 //
-// A vendor with an active USER role can also use
-// customer/user APIs.
+// Requires:
+//
+// role = user
+// suspended = false
+//
+// A vendor with BOTH:
+//
+// user    suspended=false
+// vendor  suspended=false
+//
+// can access /user routes.
 //
 // =====================================================
 
-const authorizeUser = authorizeRoles(
-    "user"
-);
+const authorizeUser =
+    authorizeRoles(
+        "user"
+    );
 
 
 // =====================================================
-// SUPERADMIN ACCESS
+// VENDOR
+// =====================================================
+//
+// Requires:
+//
+// role = vendor
+// suspended = false
+//
+// =====================================================
+
+const authorizeVendor =
+    authorizeRoles(
+        "vendor"
+    );
+
+
+// =====================================================
+// SUPERADMIN
+// =====================================================
+//
+// Requires:
+//
+// role = superadmin
+// suspended = false
+//
 // =====================================================
 
 const authorizeSuperadmin =
@@ -89,120 +220,9 @@ const authorizeSuperadmin =
     );
 
 
-// =====================================================
-// VENDOR ACCESS
-// =====================================================
-//
-// Vendor access has an additional requirement:
-//
-// suspended = false
-//
-// suspended = true
-//     => 403
-//
-// suspended = false
-//     => allowed
-//
-// =====================================================
-
-const authorizeVendor = async (
-    req,
-    res,
-    next
-) => {
-    try {
-        if (!req.user) {
-            return res.status(401).json({
-                message:
-                    "Authentication required."
-            });
-        }
-
-        const vendorAssignment =
-            await UserRole.findOne({
-                where: {
-                    userId: req.user.id,
-                    suspended: false
-                },
-
-                include: [
-                    {
-                        model: Role,
-                        as: "role",
-
-                        where: {
-                            name: "vendor"
-                        },
-
-                        attributes: [
-                            "id",
-                            "name"
-                        ]
-                    }
-                ]
-            });
-
-
-        if (!vendorAssignment) {
-            // Check whether the user is a vendor
-            const vendorRole =
-                await UserRole.findOne({
-                    where: {
-                        userId:
-                            req.user.id
-                    },
-
-                    include: [
-                        {
-                            model: Role,
-                            as: "role",
-
-                            where: {
-                                name: "vendor"
-                            },
-
-                            attributes: [
-                                "id",
-                                "name"
-                            ]
-                        }
-                    ]
-                });
-
-
-            if (vendorRole) {
-                return res.status(403).json({
-                    message:
-                        "Vendor access is suspended."
-                });
-            }
-
-            return res.status(403).json({
-                message:
-                    "Vendor role is required."
-            });
-        }
-
-
-        next();
-
-    } catch (error) {
-        console.error(
-            "Vendor authorization error:",
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                "Internal server error."
-        });
-    }
-};
-
-
 module.exports = {
     authorizeRoles,
     authorizeUser,
-    authorizeSuperadmin,
-    authorizeVendor
+    authorizeVendor,
+    authorizeSuperadmin
 };

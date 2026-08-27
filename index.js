@@ -1,19 +1,24 @@
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 
 require("dotenv").config();
 
 const sequelize = require("./config/database");
 
-const { connectDatabase } = require("./config/database");
+const {
+    connectDatabase
+} = require("./config/database");
 
-const { verifySMTPConnection } = require("./services/emailService");
+const {
+    verifySMTPConnection
+} = require("./services/emailService");
 
 require("./models");
 
-const apiRoutes = require("./routes/api");
-
+const apiRoutes =
+    require("./routes/api");
 
 const app = express();
 
@@ -26,90 +31,154 @@ app.use(morgan("dev"));
 
 app.use(
     cors({
-        origin: process.env.CORS_ORIGIN || "*"
+        origin:
+            process.env.CORS_ORIGIN || "*"
     })
 );
 
-app.use(express.json());
+app.use(
+    express.json()
+);
 
-app.use(express.urlencoded({ extended: true }));
-
-
-// =====================================================
-// HEALTH CHECK
-// =====================================================
-
-app.get("/", (req, res) => {
-    res.redirect("/health");
-});
-
-app.get("/health", (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: "Server is running."
-    });
-});
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
 
 
 // =====================================================
-// API ROUTES
+// STATIC UPLOADS
 // =====================================================
 
-app.use("/api", apiRoutes); //3000/api
-
-
-// =====================================================
-// 404 HANDLER
-// =====================================================
-
-app.use((req, res) => {
-    res.status(404).json({
-        message: "Route not found."
-    });
-});
+app.use(
+    "/uploads",
+    express.static(
+        path.join(
+            process.cwd(),
+            "uploads"
+        )
+    )
+);
 
 
 // =====================================================
-// GLOBAL ERROR HANDLER
+// HEALTH
 // =====================================================
 
-app.use((err, req, res, next) => {
-    console.error(err);
+app.get(
+    "/",
+    (req, res) => {
+        res.redirect(
+            "/health"
+        );
+    }
+);
 
-    res.status(500).json({
-        message: "Internal server error."
-    });
-});
+app.get(
+    "/health",
+    (req, res) => {
+        res.status(200).json({
+            success:
+                true,
+
+            message:
+                "Server is running."
+        });
+    }
+);
+
+
+// =====================================================
+// API
+// =====================================================
+
+app.use(
+    "/api",
+    apiRoutes
+);
+
+
+// =====================================================
+// 404
+// =====================================================
+
+app.use(
+    (req, res) => {
+        res.status(404).json({
+            message:
+                "Route not found."
+        });
+    }
+);
+
+
+// =====================================================
+// ERROR
+// =====================================================
+
+app.use(
+    (
+        err,
+        req,
+        res,
+        next
+    ) => {
+
+        console.error(err);
+
+        res.status(500).json({
+            message:
+                "Internal server error."
+        });
+    }
+);
 
 
 // =====================================================
 // START SERVER
 // =====================================================
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT =
+    Number(
+        process.env.PORT || 3000
+    );
 
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST =
+    process.env.HOST ||
+    "127.0.0.1";
 
-const startServer = async () => {
-    try {
-        await connectDatabase();
 
-        await verifySMTPConnection();
+const startServer =
+    async () => {
 
-        app.listen(PORT, HOST, () => {
-            console.log(
-                `Server running at http://${HOST}:${PORT}`
+        try {
+
+            await connectDatabase();
+
+            await verifySMTPConnection();
+
+            app.listen(
+                PORT,
+                HOST,
+                () => {
+
+                    console.log(
+                        `Server running at http://${HOST}:${PORT}`
+                    );
+                }
             );
-        });
 
-    } catch (error) {
-        console.error(
-            "Unable to start server:",
-            error.message
-        );
+        } catch (error) {
 
-        process.exit(1);
-    }
-};
+            console.error(
+                "Unable to start server:",
+                error.message
+            );
+
+            process.exit(1);
+        }
+    };
+
 
 startServer();

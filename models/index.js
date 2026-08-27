@@ -3,11 +3,12 @@ const sequelize = require("../config/database");
 const User = require("./User");
 const Role = require("./Role");
 const UserRole = require("./UserRole");
+const VendorDetails = require("./VendorDetails");
+const LoyaltyProgram = require("./LoyaltyProgram");
 
 
 // =====================================================
 // USER <-> ROLE
-// MANY-TO-MANY THROUGH user_roles
 // =====================================================
 
 User.belongsToMany(Role, {
@@ -26,7 +27,7 @@ Role.belongsToMany(User, {
 
 
 // =====================================================
-// USER ROLE DIRECT ASSOCIATIONS
+// USER <-> USER ROLE
 // =====================================================
 
 User.hasMany(UserRole, {
@@ -41,7 +42,7 @@ UserRole.belongsTo(User, {
 
 
 // =====================================================
-// ROLE DIRECT ASSOCIATIONS
+// ROLE <-> USER ROLE
 // =====================================================
 
 Role.hasMany(UserRole, {
@@ -56,7 +57,7 @@ UserRole.belongsTo(Role, {
 
 
 // =====================================================
-// USER ROLE ASSIGNED-BY ASSOCIATION
+// USER ROLE ASSIGNED BY
 // =====================================================
 
 UserRole.belongsTo(User, {
@@ -65,9 +66,49 @@ UserRole.belongsTo(User, {
 });
 
 
+// =====================================================
+// USER <-> VENDOR DETAILS
+// =====================================================
+
+User.hasOne(VendorDetails, {
+    foreignKey: "userId",
+    as: "vendorDetails",
+    onDelete: "CASCADE"
+});
+
+VendorDetails.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user"
+});
+
+
+// =====================================================
+// USER <-> LOYALTY PROGRAM
+// =====================================================
+//
+// One vendor/user can own many loyalty programs.
+//
+// vendorId points to users.id.
+//
+// =====================================================
+
+User.hasMany(LoyaltyProgram, {
+    foreignKey: "vendorId",
+    as: "loyaltyPrograms",
+    onDelete: "RESTRICT"
+});
+
+LoyaltyProgram.belongsTo(User, {
+    foreignKey: "vendorId",
+    as: "vendor"
+});
+
+
 module.exports = {
     sequelize,
     User,
     Role,
-    UserRole
+    UserRole,
+    VendorDetails,
+    LoyaltyProgram
 };
