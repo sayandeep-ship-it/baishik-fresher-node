@@ -9,6 +9,7 @@ const User = sequelize.define(
             primaryKey: true,
             autoIncrement: true
         },
+
         firstName: {
             type: DataTypes.STRING(100),
             allowNull: false
@@ -18,7 +19,7 @@ const User = sequelize.define(
             type: DataTypes.STRING(100),
             allowNull: false
         },
-        
+
         email: {
             type: DataTypes.STRING(255),
             allowNull: false,
@@ -49,29 +50,24 @@ const User = sequelize.define(
             allowNull: true
         },
 
-        // Registration OTP
-        emailVerificationOtpHash: {
-            type: DataTypes.STRING(64),
+        // Shared OTP
+        // Used for:
+        // - Email verification
+        // - Forgot password
+        //
+        // OTP is stored directly in the database.
+        otp: {
+            type: DataTypes.STRING(6),
             allowNull: true
         },
 
-        emailVerificationOtpExpiry: {
+        // Expiry time for the current OTP
+        otpExpiry: {
             type: DataTypes.DATE,
             allowNull: true
         },
 
-        // Password reset OTP
-        passwordResetOtpHash: {
-            type: DataTypes.STRING(64),
-            allowNull: true
-        },
-
-        passwordResetOtpExpiry: {
-            type: DataTypes.DATE,
-            allowNull: true
-        },
-
-        // Used to invalidate previously issued reset tokens
+        // Used to invalidate previously issued password reset tokens
         passwordResetVersion: {
             type: DataTypes.INTEGER,
             allowNull: false,

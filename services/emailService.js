@@ -12,13 +12,24 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendOTP = async (to, otp, subject) => {
+const sendOTP = async (
+    to,
+    otp,
+    subject
+) => {
     const mailOptions = {
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:
+            process.env.SMTP_FROM ||
+            process.env.SMTP_USER,
+
         to,
+
         subject,
 
-        text: `Your OTP is ${otp}. It is valid for ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`,
+        text:
+            `Your OTP is ${otp}. ` +
+            `It is valid for ` +
+            `${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`,
 
         html: `
             <div style="font-family: Arial, sans-serif;">
@@ -37,18 +48,24 @@ const sendOTP = async (to, otp, subject) => {
                 </p>
 
                 <p>
-                    If you did not request this code, please ignore this email.
+                    If you did not request this code,
+                    please ignore this email.
                 </p>
             </div>
         `
     };
 
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(
+        mailOptions
+    );
 };
 
 const verifySMTPConnection = async () => {
     await transporter.verify();
-    console.log("SMTP connection verified.");
+
+    console.log(
+        "SMTP connection verified."
+    );
 };
 
 module.exports = {

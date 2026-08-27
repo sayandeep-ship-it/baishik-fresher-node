@@ -13,43 +13,75 @@ const authorizeRoles = require("../middleware/roleMiddleware");
 // AUTH ROUTES
 // =====================================================
 
-// Registration
+// =====================================================
+// REGISTER
+// =====================================================
+
 router.post(
     "/auth/register",
     authController.register
 );
 
-// Verify registration OTP
+
+// =====================================================
+// VERIFY OTP
+// =====================================================
+//
+// One route handles:
+//
+// emailVerification
+// forgotPassword
+//
+// Body:
+//
+// {
+//     "email": "user@example.com",
+//     "otp": "123456",
+//     "otpPurpose": "emailVerification"
+// }
+//
+// =====================================================
+
 router.post(
-    "/auth/verify-email",
-    authController.verifyRegistration
+    "/auth/verify-otp",
+    authController.verifyOTP
 );
 
-// Resend registration OTP
+
+// =====================================================
+// RESEND REGISTRATION OTP
+// =====================================================
+
 router.post(
     "/auth/resend-verification",
     authController.resendVerificationOTP
 );
 
-// Login
+
+// =====================================================
+// LOGIN
+// =====================================================
+
 router.post(
     "/auth/login",
     authController.login
 );
 
-// Forgot password
+
+// =====================================================
+// FORGOT PASSWORD
+// =====================================================
+
 router.post(
     "/auth/forgot-password",
     authController.forgotPassword
 );
 
-// Verify password reset OTP
-router.post(
-    "/auth/verify-reset-otp",
-    authController.verifyResetOTP
-);
 
-// Reset password
+// =====================================================
+// RESET PASSWORD
+// =====================================================
+
 router.post(
     "/auth/reset-password",
     authController.resetPassword

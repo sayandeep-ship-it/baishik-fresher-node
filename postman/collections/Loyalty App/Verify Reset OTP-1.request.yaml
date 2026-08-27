@@ -1,0 +1,5 @@
+$kind: http-request
+name: Verify Reset OTP
+url: ""
+method: GET
+order: 4498297648830489
