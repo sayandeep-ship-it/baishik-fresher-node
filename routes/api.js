@@ -15,9 +15,6 @@ const rbacController =
 
 const vendorController =
     require("../controller/vendorController");
-    
-const loyaltyController =
-    require("../controller/Loyalty_Controller");
 
 // =====================================================
 // MIDDLEWARE
