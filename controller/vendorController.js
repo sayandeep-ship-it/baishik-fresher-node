@@ -1,11 +1,14 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { Op } = require("sequelize");
 
 const {
     User,
     Role,
     UserRole,
-    VendorDetails
+    VendorDetails,
+    LoyaltyProgram,
+    UserVendorEnrollment
 } = require("../models");
 
 
@@ -406,7 +409,10 @@ exports.saveAddress = async (
             city,
             country,
             state,
-            pinCode
+            pinCode,
+            storeName,
+            storeType,
+            image
         } = req.body;
 
 
@@ -525,7 +531,22 @@ exports.saveAddress = async (
                         state.trim(),
 
                     pinCode:
-                        pinCode.trim()
+                        pinCode.trim(),
+
+                    storeName:
+                        storeName
+                            ? String(storeName).trim()
+                            : null,
+
+                    storeType:
+                        storeType
+                            ? String(storeType).trim()
+                            : null,
+
+                    image:
+                        image
+                            ? String(image).trim()
+                            : null
                 });
 
         } else {
@@ -551,6 +572,27 @@ exports.saveAddress = async (
 
             vendorDetails.hasAddress =
                 true;
+
+            if (storeName !== undefined) {
+                vendorDetails.storeName =
+                    storeName
+                        ? String(storeName).trim()
+                        : null;
+            }
+
+            if (storeType !== undefined) {
+                vendorDetails.storeType =
+                    storeType
+                        ? String(storeType).trim()
+                        : null;
+            }
+
+            if (image !== undefined) {
+                vendorDetails.image =
+                    image
+                        ? String(image).trim()
+                        : null;
+            }
 
 
             await vendorDetails.save();
@@ -587,7 +629,16 @@ exports.saveAddress = async (
                     vendorDetails.state,
 
                 pinCode:
-                    vendorDetails.pinCode
+                    vendorDetails.pinCode,
+
+                storeName:
+                    vendorDetails.storeName,
+
+                storeType:
+                    vendorDetails.storeType,
+
+                image:
+                    vendorDetails.image
             }
         });
 
@@ -662,7 +713,16 @@ exports.getAddress = async (
                     vendorDetails.state,
 
                 pinCode:
-                    vendorDetails.pinCode
+                    vendorDetails.pinCode,
+
+                storeName:
+                    vendorDetails.storeName,
+
+                storeType:
+                    vendorDetails.storeType,
+
+                image:
+                    vendorDetails.image
             }
         });
 
@@ -878,6 +938,326 @@ exports.changeVendorPassword = async (
 
         console.error(
             "Vendor change password error:",
+            error
+        );
+
+        return res.status(500).json({
+            message:
+                "Internal server error."
+        });
+    }
+};
+
+
+const ISO_DATE_PATTERN =
+    /^\d{4}-\d{2}-\d{2}$/;
+
+
+const parseIsoDateParts = (
+    value
+) => {
+    if (
+        typeof value !== "string" ||
+        !ISO_DATE_PATTERN.test(
+            value
+        )
+    ) {
+        return null;
+    }
+
+    const [
+        year,
+        month,
+        day
+    ] = value.split("-").map(
+        Number
+    );
+
+    const utcDate =
+        new Date(
+            Date.UTC(
+                year,
+                month - 1,
+                day
+            )
+        );
+
+    if (
+        utcDate.getUTCFullYear() !== year ||
+        utcDate.getUTCMonth() !== month - 1 ||
+        utcDate.getUTCDate() !== day
+    ) {
+        return null;
+    }
+
+    return {
+        year,
+        month,
+        day
+    };
+};
+
+
+const parseDashboardDateRange = (
+    startDate,
+    endDate
+) => {
+    const hasStart =
+        startDate !== undefined &&
+        startDate !== null &&
+        String(startDate).trim() !== "";
+
+    const hasEnd =
+        endDate !== undefined &&
+        endDate !== null &&
+        String(endDate).trim() !== "";
+
+    if (!hasStart && !hasEnd) {
+        return {
+            startDate: null,
+            endDate: null,
+            createdAtFilter: null
+        };
+    }
+
+    if (!hasStart || !hasEnd) {
+        return {
+            error:
+                "Both startDate and endDate are required."
+        };
+    }
+
+    const startParts =
+        parseIsoDateParts(
+            String(startDate).trim()
+        );
+
+    const endParts =
+        parseIsoDateParts(
+            String(endDate).trim()
+        );
+
+    if (!startParts || !endParts) {
+        return {
+            error:
+                "startDate and endDate must be valid dates in YYYY-MM-DD format."
+        };
+    }
+
+    const rangeStart =
+        new Date(
+            Date.UTC(
+                startParts.year,
+                startParts.month - 1,
+                startParts.day,
+                0,
+                0,
+                0,
+                0
+            )
+        );
+
+    const rangeEnd =
+        new Date(
+            Date.UTC(
+                endParts.year,
+                endParts.month - 1,
+                endParts.day,
+                23,
+                59,
+                59,
+                999
+            )
+        );
+
+    if (rangeStart > rangeEnd) {
+        return {
+            error:
+                "startDate cannot be after endDate."
+        };
+    }
+
+    return {
+        startDate:
+            String(startDate).trim(),
+
+        endDate:
+            String(endDate).trim(),
+
+        createdAtFilter: {
+            [Op.between]: [
+                rangeStart,
+                rangeEnd
+            ]
+        }
+    };
+};
+
+
+const mapLoyaltyProgramCard = (
+    program
+) => {
+    return {
+        id:
+            program.id,
+
+        image:
+            program.image,
+
+        programName:
+            program.programName,
+
+        requiredStars:
+            program.requiredStarCollection,
+
+        scanInterval: {
+            value:
+                program.qrCodeScanIntervalValue,
+
+            unit:
+                program.qrCodeScanIntervalUnit
+        },
+
+        participated:
+            0,
+
+        totalStars:
+            0,
+
+        description:
+            program.programRules,
+
+        createdAt:
+            program.createdAt
+    };
+};
+
+
+// =====================================================
+// VENDOR DASHBOARD
+// =====================================================
+//
+// GET /api/vendor/dashboard
+//
+// Requires authenticated active vendor.
+//
+// Optional query:
+//
+// startDate=YYYY-MM-DD
+// endDate=YYYY-MM-DD
+//
+// Date range filters summary counts only.
+// Recent programs remain the latest 5 overall.
+//
+// =====================================================
+
+exports.getDashboard = async (
+    req,
+    res
+) => {
+    try {
+
+        const vendorId =
+            req.user.id;
+
+        const dateRange =
+            parseDashboardDateRange(
+                req.query.startDate,
+                req.query.endDate
+            );
+
+        if (dateRange.error) {
+            return res.status(400).json({
+                message:
+                    dateRange.error
+            });
+        }
+
+        const programWhere = {
+            vendorId
+        };
+
+        const enrollmentWhere = {
+            vendorId
+        };
+
+        if (dateRange.createdAtFilter) {
+            programWhere.createdAt =
+                dateRange.createdAtFilter;
+
+            enrollmentWhere.createdAt =
+                dateRange.createdAtFilter;
+        }
+
+        const [
+            activeLoyaltyPrograms,
+            totalCustomers,
+            recentPrograms
+        ] = await Promise.all([
+            LoyaltyProgram.count({
+                where:
+                    programWhere
+            }),
+
+            UserVendorEnrollment.count({
+                where:
+                    enrollmentWhere
+            }),
+
+            LoyaltyProgram.findAll({
+                where: {
+                    vendorId
+                },
+
+                order: [
+                    [
+                        "createdAt",
+                        "DESC"
+                    ]
+                ],
+
+                limit: 5
+            })
+        ]);
+
+        return res.status(200).json({
+
+            success:
+                true,
+
+            message:
+                "Vendor dashboard fetched successfully",
+
+            dateRange: {
+                startDate:
+                    dateRange.startDate,
+
+                endDate:
+                    dateRange.endDate
+            },
+
+            summary: {
+                activeLoyaltyPrograms,
+
+                totalCustomers,
+
+                rewardsRedeemed:
+                    0,
+
+                fraudAlerts:
+                    0
+            },
+
+            recentLoyaltyPrograms:
+                recentPrograms.map(
+                    mapLoyaltyProgramCard
+                )
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Get vendor dashboard error:",
             error
         );
 

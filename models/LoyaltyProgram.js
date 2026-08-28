@@ -137,6 +137,11 @@ const LoyaltyProgram = sequelize.define(
             allowNull: false,
             defaultValue: false,
             field: "enable_pin_verification"
+        },
+
+        details: {
+            type: DataTypes.JSON,
+            allowNull: true
         }
     },
 

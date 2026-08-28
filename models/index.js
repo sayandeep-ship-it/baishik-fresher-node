@@ -5,6 +5,7 @@ const Role = require("./Role");
 const UserRole = require("./UserRole");
 const VendorDetails = require("./VendorDetails");
 const LoyaltyProgram = require("./LoyaltyProgram");
+const UserVendorEnrollment = require("./UserVendorEnrollment");
 
 
 // =====================================================
@@ -104,11 +105,43 @@ LoyaltyProgram.belongsTo(User, {
 });
 
 
+// =====================================================
+// USER <-> VENDOR ENROLLMENT
+// =====================================================
+//
+// Tracks stars collected by a user under a vendor.
+//
+// =====================================================
+
+User.hasMany(UserVendorEnrollment, {
+    foreignKey: "userId",
+    as: "vendorEnrollments",
+    onDelete: "CASCADE"
+});
+
+UserVendorEnrollment.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user"
+});
+
+User.hasMany(UserVendorEnrollment, {
+    foreignKey: "vendorId",
+    as: "storeEnrollments",
+    onDelete: "RESTRICT"
+});
+
+UserVendorEnrollment.belongsTo(User, {
+    foreignKey: "vendorId",
+    as: "vendor"
+});
+
+
 module.exports = {
     sequelize,
     User,
     Role,
     UserRole,
     VendorDetails,
-    LoyaltyProgram
+    LoyaltyProgram,
+    UserVendorEnrollment
 };

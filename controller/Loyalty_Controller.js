@@ -3,6 +3,45 @@ const {
 } = require("../models");
 
 
+const mapLoyaltyProgramCard = (
+    program
+) => {
+    return {
+        id:
+            program.id,
+
+        image:
+            program.image,
+
+        programName:
+            program.programName,
+
+        requiredStars:
+            program.requiredStarCollection,
+
+        scanInterval: {
+            value:
+                program.qrCodeScanIntervalValue,
+
+            unit:
+                program.qrCodeScanIntervalUnit
+        },
+
+        participated:
+            0,
+
+        totalStars:
+            0,
+
+        description:
+            program.programRules,
+
+        createdAt:
+            program.createdAt
+    };
+};
+
+
 // =====================================================
 // CREATE LOYALTY PROGRAM
 // =====================================================
@@ -455,6 +494,18 @@ async function createLoyaltyProgram(
                         ? programRules.trim()
                         : null,
 
+                details: {
+                    images:
+                        imagePath
+                            ? [imagePath]
+                            : [],
+
+                    rules:
+                        programRules
+                            ? programRules.trim()
+                            : null
+                },
+
 
                 // =========================================
                 // NOTIFICATION
@@ -536,6 +587,9 @@ async function createLoyaltyProgram(
 
                 programRules:
                     loyaltyProgram.programRules,
+
+                details:
+                    loyaltyProgram.details,
 
 
                 // Notification
@@ -625,7 +679,10 @@ async function getRecentLoyaltyPrograms(
             count:
                 loyaltyPrograms.length,
 
-            loyaltyPrograms
+            loyaltyPrograms:
+                loyaltyPrograms.map(
+                    mapLoyaltyProgramCard
+                )
         });
 
     } catch (error) {
@@ -682,7 +739,10 @@ async function getAllLoyaltyPrograms(
             count:
                 loyaltyPrograms.length,
 
-            loyaltyPrograms
+            loyaltyPrograms:
+                loyaltyPrograms.map(
+                    mapLoyaltyProgramCard
+                )
         });
 
     } catch (error) {

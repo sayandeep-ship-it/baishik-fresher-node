@@ -19,6 +19,9 @@ const vendorController =
 const loyaltyController =
     require("../controller/Loyalty_Controller");
 
+const userController =
+    require("../controller/userController");
+
 
 // =====================================================
 // MIDDLEWARE
@@ -134,35 +137,72 @@ router.get(
     "/user/profile",
     authenticate,
     authorizeUser,
-    (req, res) => {
+    userController.getProfile
+);
 
-        return res.status(200).json({
 
-            success:
-                true,
+// -----------------------------------------------------
+// USER PROFILE UPDATE
+// -----------------------------------------------------
 
-            message:
-                "User route accessed successfully.",
+router.patch(
+    "/user/profile",
+    authenticate,
+    authorizeUser,
+    userController.updateProfile
+);
 
-            user: {
 
-                id:
-                    req.user.id,
+// -----------------------------------------------------
+// USER CHANGE PASSWORD
+// -----------------------------------------------------
+//
+// Logged-in user.
+// No OTP.
+//
+// -----------------------------------------------------
 
-                firstName:
-                    req.user.firstName,
+router.patch(
+    "/user/change-password",
+    authenticate,
+    authorizeUser,
+    userController.changePassword
+);
 
-                lastName:
-                    req.user.lastName,
 
-                email:
-                    req.user.email,
+// -----------------------------------------------------
+// STORE LISTING
+// -----------------------------------------------------
 
-                roles:
-                    req.user.roles
-            }
-        });
-    }
+router.get(
+    "/user/stores",
+    authenticate,
+    authorizeUser,
+    userController.getStores
+);
+
+
+// -----------------------------------------------------
+// STORE + LOYALTY PROGRAMS
+// -----------------------------------------------------
+
+router.get(
+    "/user/stores/:vendorId",
+    authenticate,
+    authorizeUser,
+    userController.getStoreById
+);
+
+
+// -----------------------------------------------------
+// LOYALTY PROGRAM DETAILS
+// -----------------------------------------------------
+
+router.get(
+    "/user/stores/:vendorId/loyalty-programs/:programId",
+    authenticate,
+    authorizeUser,
+    userController.getLoyaltyProgramDetails
 );
 
 
@@ -267,6 +307,18 @@ router.get(
     authenticate,
     authorizeVendor,
     vendorController.getAddress
+);
+
+
+// -----------------------------------------------------
+// VENDOR DASHBOARD
+// -----------------------------------------------------
+
+router.get(
+    "/vendor/dashboard",
+    authenticate,
+    authorizeVendor,
+    vendorController.getDashboard
 );
 
 

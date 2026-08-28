@@ -49,6 +49,23 @@ const VendorDetails = sequelize.define(
             type: DataTypes.STRING(20),
             allowNull: true,
             field: "pin_code"
+        },
+
+        storeName: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+            field: "store_name"
+        },
+
+        storeType: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+            field: "store_type"
+        },
+
+        image: {
+            type: DataTypes.STRING(500),
+            allowNull: true
         }
     },
     {
