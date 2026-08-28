@@ -15,6 +15,8 @@ const rbacController =
 
 const vendorController =
     require("../controller/vendorController");
+const loyaltyController =
+    require("../controller/Loyalty_Controller");
 
 // =====================================================
 // MIDDLEWARE
@@ -29,8 +31,6 @@ const {
     authorizeSuperadmin
 } = require("../middleware/roleMiddleware");
 
-const loyaltyController =
-    require("../controller/Loyalty_Controller");
 
 const uploadLoyaltyImage =
     require("../middleware/loyaltyUploadMiddleware");
@@ -292,7 +292,21 @@ router.get(
 // =====================================================
 // ADMIN / SUPERADMIN ROUTES
 // =====================================================
+//
+// Public authentication endpoint.
+//
+// Controller verifies:
+//
+// superadmin role exists
+// suspended = false
+// password correct
+//
+// -----------------------------------------------------
 
+router.post(
+    "/admin/login",
+    authController.adminLogin
+);
 
 // -----------------------------------------------------
 // APPOINT USER AS VENDOR

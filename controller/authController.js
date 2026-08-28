@@ -20,15 +20,19 @@ const {
 
 const generateOTP = () => {
     return crypto
-        .randomInt(100000, 1000000)
+        .randomInt(
+            100000,
+            1000000
+        )
         .toString();
 };
 
 
 const getOTPExpiry = () => {
-    const minutes = Number(
-        process.env.OTP_EXPIRY_MINUTES || 10
-    );
+    const minutes =
+        Number(
+            process.env.OTP_EXPIRY_MINUTES || 10
+        );
 
     return new Date(
         Date.now() +
@@ -84,30 +88,38 @@ const getRoleByName = async (roleName) => {
 //
 // =====================================================
 
-const getUserRoleAssignments = async (userId) => {
-    const assignments = await UserRole.findAll({
-        where: {
-            userId
-        },
+const getUserRoleAssignments = async (
+    userId
+) => {
+    const assignments =
+        await UserRole.findAll({
+            where: {
+                userId
+            },
 
-        include: [
-            {
-                model: Role,
-                as: "role",
-                attributes: [
-                    "id",
-                    "name"
-                ]
-            }
-        ]
-    });
+            include: [
+                {
+                    model: Role,
+                    as: "role",
+                    attributes: [
+                        "id",
+                        "name"
+                    ]
+                }
+            ]
+        });
 
-    return assignments.map((assignment) => {
-        return {
-            role: assignment.role.name,
-            suspended: assignment.suspended
-        };
-    });
+    return assignments.map(
+        (assignment) => {
+            return {
+                role:
+                    assignment.role.name,
+
+                suspended:
+                    assignment.suspended
+            };
+        }
+    );
 };
 
 
@@ -115,10 +127,15 @@ const getUserRoleAssignments = async (userId) => {
 // GET ACTIVE ROLE NAMES
 // =====================================================
 //
-// Used for JWT.
-//
 // IMPORTANT:
-// JWT contains:
+//
+// Only roles where:
+//
+// suspended = false
+//
+// are included in the JWT.
+//
+// JWT:
 //
 // {
 //     id: user.id,
@@ -127,23 +144,26 @@ const getUserRoleAssignments = async (userId) => {
 //
 // =====================================================
 
-const getActiveRoleNames = async (userId) => {
-    const assignments = await UserRole.findAll({
-        where: {
-            userId,
-            suspended: false
-        },
+const getActiveRoleNames = async (
+    userId
+) => {
+    const assignments =
+        await UserRole.findAll({
+            where: {
+                userId,
+                suspended: false
+            },
 
-        include: [
-            {
-                model: Role,
-                as: "role",
-                attributes: [
-                    "name"
-                ]
-            }
-        ]
-    });
+            include: [
+                {
+                    model: Role,
+                    as: "role",
+                    attributes: [
+                        "name"
+                    ]
+                }
+            ]
+        });
 
     return assignments.map(
         (assignment) =>
@@ -155,8 +175,19 @@ const getActiveRoleNames = async (userId) => {
 // =====================================================
 // CREATE ACCESS TOKEN
 // =====================================================
+//
+// JWT:
+//
+// {
+//     id: user.id,
+//     roles: ["user", "vendor"]
+// }
+//
+// =====================================================
 
-const createAccessToken = async (user) => {
+const createAccessToken = async (
+    user
+) => {
     const roles =
         await getActiveRoleNames(
             user.id
@@ -164,8 +195,11 @@ const createAccessToken = async (user) => {
 
     return jwt.sign(
         {
-            id: user.id,
-            roles: roles
+            id:
+                user.id,
+
+            roles:
+                roles
         },
 
         process.env.JWT_SECRET,
@@ -185,19 +219,21 @@ const createAccessToken = async (user) => {
 //
 // Public registration ONLY creates / assigns USER.
 //
-// Vendor cannot register as vendor.
+// Vendor cannot self-register as vendor.
 //
-// If a vendor already exists with the same email and
-// doesn't have the USER role yet:
-//
+// If a vendor already exists with the same email:
 // - existing password must match
 // - USER role is added
-// - no second users record is created
+// - second users row is NOT created
 //
 // =====================================================
 
-exports.register = async (req, res) => {
+exports.register = async (
+    req,
+    res
+) => {
     try {
+
         const {
             firstName,
             lastName,
@@ -242,7 +278,9 @@ exports.register = async (req, res) => {
             lastName.trim();
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
 
         // =================================================
@@ -287,7 +325,7 @@ exports.register = async (req, res) => {
 
 
             // ---------------------------------------------
-            // Existing normal USER
+            // Existing USER
             // ---------------------------------------------
 
             if (hasUserRole) {
@@ -301,8 +339,7 @@ exports.register = async (req, res) => {
             // ---------------------------------------------
             // Existing VENDOR
             //
-            // Allow same identity to become USER.
-            // Do NOT create another users row.
+            // Add USER role to same identity.
             // ---------------------------------------------
 
             if (hasVendorRole) {
@@ -336,7 +373,6 @@ exports.register = async (req, res) => {
                 }
 
 
-                // Check whether USER role exists
                 const existingUserRole =
                     await UserRole.findOne({
                         where: {
@@ -442,6 +478,7 @@ exports.register = async (req, res) => {
 
         const user =
             await User.create({
+
                 firstName:
                     normalizedFirstName,
 
@@ -460,7 +497,7 @@ exports.register = async (req, res) => {
                 emailVerifiedAt:
                     null,
 
-                // OTP IS STORED DIRECTLY
+                // OTP stored directly
                 otp:
                     otp,
 
@@ -473,10 +510,11 @@ exports.register = async (req, res) => {
 
 
         // =================================================
-        // ASSIGN USER ROLE THROUGH JUNCTION TABLE
+        // ASSIGN USER ROLE
         // =================================================
 
         await UserRole.create({
+
             userId:
                 user.id,
 
@@ -499,6 +537,7 @@ exports.register = async (req, res) => {
         // =================================================
 
         try {
+
             await sendOTP(
                 normalizedEmail,
                 otp,
@@ -507,8 +546,7 @@ exports.register = async (req, res) => {
 
         } catch (emailError) {
 
-            // IMPORTANT:
-            // User MUST remain in database.
+            // User MUST remain in DB.
 
             console.error(
                 "Registration email error:",
@@ -551,10 +589,11 @@ exports.register = async (req, res) => {
 // POST /api/auth/verify-otp
 //
 // otpPurpose:
-//   emailVerification
-//   forgotPassword
 //
-// OTP IS COMPARED DIRECTLY.
+// emailVerification
+// forgotPassword
+//
+// OTP IS STORED DIRECTLY.
 // NO HASHING.
 //
 // =====================================================
@@ -564,6 +603,7 @@ exports.verifyOTP = async (
     res
 ) => {
     try {
+
         const {
             email,
             otp,
@@ -606,7 +646,9 @@ exports.verifyOTP = async (
 
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
 
         const user =
@@ -654,7 +696,6 @@ exports.verifyOTP = async (
             }
 
 
-            // EXPIRY
             if (
                 new Date() >
                 user.otpExpiry
@@ -688,7 +729,6 @@ exports.verifyOTP = async (
             user.emailVerifiedAt =
                 new Date();
 
-            // OTP CANNOT BE REUSED
             user.otp =
                 null;
 
@@ -700,7 +740,7 @@ exports.verifyOTP = async (
 
 
             // =================================================
-            // GET ACTIVE ROLES
+            // ACTIVE ROLES
             // =================================================
 
             const roles =
@@ -714,22 +754,8 @@ exports.verifyOTP = async (
             // =================================================
 
             const token =
-                jwt.sign(
-                    {
-                        id:
-                            user.id,
-
-                        roles:
-                            roles
-                    },
-
-                    process.env.JWT_SECRET,
-
-                    {
-                        expiresIn:
-                            process.env.JWT_EXPIRES_IN ||
-                            "1d"
-                    }
+                await createAccessToken(
+                    user
                 );
 
 
@@ -810,7 +836,7 @@ exports.verifyOTP = async (
             }
 
 
-            // OTP CANNOT BE REUSED
+            // OTP cannot be reused.
             user.otp =
                 null;
 
@@ -822,7 +848,7 @@ exports.verifyOTP = async (
 
 
             // =================================================
-            // PASSWORD RESET TOKEN
+            // CREATE PASSWORD RESET TOKEN
             // =================================================
 
             const resetToken =
@@ -896,7 +922,9 @@ exports.resendVerificationOTP =
 
 
             const normalizedEmail =
-                normalizeEmail(email);
+                normalizeEmail(
+                    email
+                );
 
 
             const user =
@@ -975,7 +1003,9 @@ exports.resendVerificationOTP =
 // POST /api/user/login
 //
 // Requires:
-// ACTIVE user role
+//
+// USER role
+// suspended = false
 //
 // =====================================================
 
@@ -984,6 +1014,7 @@ exports.login = async (
     res
 ) => {
     try {
+
         const {
             email,
             password
@@ -1002,7 +1033,9 @@ exports.login = async (
 
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
 
         const user =
@@ -1031,7 +1064,7 @@ exports.login = async (
 
 
         // =================================================
-        // CHECK USER ROLE THROUGH JUNCTION TABLE
+        // USER ROLE FROM user_roles
         // =================================================
 
         const userRole =
@@ -1091,7 +1124,7 @@ exports.login = async (
 
 
         // =================================================
-        // ACTIVE ROLE NAMES
+        // ACTIVE ROLES
         // =================================================
 
         const roles =
@@ -1105,22 +1138,8 @@ exports.login = async (
         // =================================================
 
         const token =
-            jwt.sign(
-                {
-                    id:
-                        user.id,
-
-                    roles:
-                        roles
-                },
-
-                process.env.JWT_SECRET,
-
-                {
-                    expiresIn:
-                        process.env.JWT_EXPIRES_IN ||
-                        "1d"
-                }
+            await createAccessToken(
+                user
             );
 
 
@@ -1164,36 +1183,57 @@ exports.login = async (
 
 
 // =====================================================
-// USER FORGOT PASSWORD
+// SUPERADMIN LOGIN
 // =====================================================
 //
-// POST /api/user/forgot-password
+// POST /api/admin/login
 //
-// Requires active USER role.
+// Requires:
+//
+// SUPERADMIN role
+// suspended = false
+//
+// The superadmin does NOT need the USER role simply
+// to authenticate.
 //
 // =====================================================
 
-exports.forgotPassword = async (
+exports.adminLogin = async (
     req,
     res
 ) => {
     try {
+
         const {
-            email
+            email,
+            password
         } = req.body;
 
 
-        if (!email) {
+        // =================================================
+        // VALIDATION
+        // =================================================
+
+        if (
+            !email ||
+            !password
+        ) {
             return res.status(400).json({
                 message:
-                    "Email is required."
+                    "Email and password are required."
             });
         }
 
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
+
+        // =================================================
+        // FIND USER
+        // =================================================
 
         const user =
             await User.findOne({
@@ -1205,12 +1245,16 @@ exports.forgotPassword = async (
 
 
         if (!user) {
-            return res.status(404).json({
+            return res.status(401).json({
                 message:
-                    "User not found."
+                    "Invalid email or password."
             });
         }
 
+
+        // =================================================
+        // ACCOUNT STATUS
+        // =================================================
 
         if (!user.isActive) {
             return res.status(403).json({
@@ -1221,31 +1265,39 @@ exports.forgotPassword = async (
 
 
         // =================================================
-        // USER ROLE
+        // FIND SUPERADMIN ROLE
         // =================================================
 
-        const userRole =
+        const superadminRole =
             await getRoleByName(
-                "user"
+                "superadmin"
             );
 
 
-        if (!userRole) {
+        if (!superadminRole) {
             return res.status(500).json({
                 message:
-                    "User role is not configured."
+                    "Superadmin role is not configured."
             });
         }
 
 
-        const userAssignment =
+        // =================================================
+        // CHECK SUPERADMIN ASSIGNMENT
+        // =================================================
+        //
+        // MANDATORY user_roles CHECK
+        //
+        // =================================================
+
+        const superadminAssignment =
             await UserRole.findOne({
                 where: {
                     userId:
                         user.id,
 
                     roleId:
-                        userRole.id,
+                        superadminRole.id,
 
                     suspended:
                         false
@@ -1253,51 +1305,96 @@ exports.forgotPassword = async (
             });
 
 
-        if (!userAssignment) {
+        if (!superadminAssignment) {
             return res.status(403).json({
                 message:
-                    "Active user role is required."
+                    "Active superadmin role is required."
             });
         }
 
 
         // =================================================
-        // GENERATE OTP
+        // PASSWORD
         // =================================================
 
-        const otp =
-            generateOTP();
-
-        const otpExpiry =
-            getOTPExpiry();
-
-
-        user.otp =
-            otp;
-
-        user.otpExpiry =
-            otpExpiry;
+        const passwordMatch =
+            await bcrypt.compare(
+                password,
+                user.password
+            );
 
 
-        await user.save();
+        if (!passwordMatch) {
+            return res.status(401).json({
+                message:
+                    "Invalid email or password."
+            });
+        }
 
 
-        await sendOTP(
-            normalizedEmail,
-            otp,
-            "Password Reset OTP"
-        );
+        // =================================================
+        // GET ALL ACTIVE ROLES
+        // =================================================
+        //
+        // This preserves the multi-role JWT model.
+        //
+        // Example:
+        //
+        // {
+        //     id: 1,
+        //     roles: ["superadmin"]
+        // }
+        //
+        // =================================================
 
+        const roles =
+            await getActiveRoleNames(
+                user.id
+            );
+
+
+        // =================================================
+        // CREATE JWT
+        // =================================================
+
+        const token =
+            await createAccessToken(
+                user
+            );
+
+
+        // =================================================
+        // RESPONSE
+        // =================================================
 
         return res.status(200).json({
             message:
-                "Password reset OTP has been sent to your email."
+                "Superadmin login successful.",
+
+            token,
+
+            user: {
+                id:
+                    user.id,
+
+                firstName:
+                    user.firstName,
+
+                lastName:
+                    user.lastName,
+
+                email:
+                    user.email,
+
+                roles:
+                    roles
+            }
         });
 
     } catch (error) {
 
         console.error(
-            "User forgot password error:",
+            "Superadmin login error:",
             error
         );
 
@@ -1310,24 +1407,170 @@ exports.forgotPassword = async (
 
 
 // =====================================================
+// USER FORGOT PASSWORD
+// =====================================================
+//
+// POST /api/user/forgot-password
+//
+// Requires active USER role.
+//
+// =====================================================
+
+exports.forgotPassword =
+    async (
+        req,
+        res
+    ) => {
+        try {
+
+            const {
+                email
+            } = req.body;
+
+
+            if (!email) {
+                return res.status(400).json({
+                    message:
+                        "Email is required."
+                });
+            }
+
+
+            const normalizedEmail =
+                normalizeEmail(
+                    email
+                );
+
+
+            const user =
+                await User.findOne({
+                    where: {
+                        email:
+                            normalizedEmail
+                    }
+                });
+
+
+            if (!user) {
+                return res.status(404).json({
+                    message:
+                        "User not found."
+                });
+            }
+
+
+            if (!user.isActive) {
+                return res.status(403).json({
+                    message:
+                        "Account is inactive."
+                });
+            }
+
+
+            // =================================================
+            // USER ROLE
+            // =================================================
+
+            const userRole =
+                await getRoleByName(
+                    "user"
+                );
+
+
+            if (!userRole) {
+                return res.status(500).json({
+                    message:
+                        "User role is not configured."
+                });
+            }
+
+
+            const userAssignment =
+                await UserRole.findOne({
+                    where: {
+                        userId:
+                            user.id,
+
+                        roleId:
+                            userRole.id,
+
+                        suspended:
+                            false
+                    }
+                });
+
+
+            if (!userAssignment) {
+                return res.status(403).json({
+                    message:
+                        "Active user role is required."
+                });
+            }
+
+
+            // =================================================
+            // GENERATE OTP
+            // =================================================
+
+            const otp =
+                generateOTP();
+
+            const otpExpiry =
+                getOTPExpiry();
+
+
+            user.otp =
+                otp;
+
+            user.otpExpiry =
+                otpExpiry;
+
+
+            await user.save();
+
+
+            await sendOTP(
+                normalizedEmail,
+                otp,
+                "Password Reset OTP"
+            );
+
+
+            return res.status(200).json({
+                message:
+                    "Password reset OTP has been sent to your email."
+            });
+
+        } catch (error) {
+
+            console.error(
+                "User forgot password error:",
+                error
+            );
+
+            return res.status(500).json({
+                message:
+                    "Internal server error."
+            });
+        }
+    };
+
+
+// =====================================================
 // VENDOR LOGIN
 // =====================================================
 //
 // POST /api/vendor/login
 //
-// Requirements:
+// Requires:
 //
-// 1. User exists
-// 2. Active account
-// 3. Vendor role exists in user_roles
-// 4. vendor.suspended = false
-// 5. Password correct
+// VENDOR role
+// suspended = false
+// correct password
 //
-// Then:
-// vendor_details.has_address
+// Then checks:
 //
-// true  -> normal successful login
-// false -> requiresAddress = true
+// vendor_details.hasAddress
 //
 // =====================================================
 
@@ -1336,6 +1579,7 @@ exports.vendorLogin = async (
     res
 ) => {
     try {
+
         const {
             email,
             password
@@ -1354,7 +1598,9 @@ exports.vendorLogin = async (
 
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
 
         // =================================================
@@ -1391,7 +1637,7 @@ exports.vendorLogin = async (
 
 
         // =================================================
-        // FIND VENDOR ROLE
+        // VENDOR ROLE
         // =================================================
 
         const vendorRole =
@@ -1409,7 +1655,7 @@ exports.vendorLogin = async (
 
 
         // =================================================
-        // FIND VENDOR ASSIGNMENT
+        // VENDOR ASSIGNMENT
         // =================================================
 
         const vendorAssignment =
@@ -1466,7 +1712,7 @@ exports.vendorLogin = async (
 
 
         // =================================================
-        // GET ACTIVE ROLES
+        // ACTIVE ROLES
         // =================================================
 
         const roles =
@@ -1476,26 +1722,12 @@ exports.vendorLogin = async (
 
 
         // =================================================
-        // CREATE JWT
+        // JWT
         // =================================================
 
         const token =
-            jwt.sign(
-                {
-                    id:
-                        user.id,
-
-                    roles:
-                        roles
-                },
-
-                process.env.JWT_SECRET,
-
-                {
-                    expiresIn:
-                        process.env.JWT_EXPIRES_IN ||
-                        "1d"
-                }
+            await createAccessToken(
+                user
             );
 
 
@@ -1517,6 +1749,7 @@ exports.vendorLogin = async (
         // =================================================
 
         if (!vendorDetails) {
+
             vendorDetails =
                 await VendorDetails.create({
                     userId:
@@ -1535,6 +1768,7 @@ exports.vendorLogin = async (
         if (
             vendorDetails.hasAddress
         ) {
+
             return res.status(200).json({
                 success:
                     true,
@@ -1571,7 +1805,7 @@ exports.vendorLogin = async (
 
 
         // =================================================
-        // ADDRESS DOES NOT EXIST
+        // ADDRESS MISSING
         // =================================================
 
         return res.status(200).json({
@@ -1628,15 +1862,16 @@ exports.vendorLogin = async (
 //
 // POST /api/vendor/forgot-password
 //
-// Uses the SAME:
+// Same OTP system:
+//
 // users.otp
 // users.otpExpiry
 //
-// Verification is still:
+// Verification:
 //
 // POST /api/auth/verify-otp
 //
-// otpPurpose = "forgotPassword"
+// otpPurpose = forgotPassword
 //
 // =====================================================
 
@@ -1646,6 +1881,7 @@ exports.vendorForgotPassword =
         res
     ) => {
         try {
+
             const {
                 email
             } = req.body;
@@ -1660,7 +1896,9 @@ exports.vendorForgotPassword =
 
 
             const normalizedEmail =
-                normalizeEmail(email);
+                normalizeEmail(
+                    email
+                );
 
 
             const user =
@@ -1792,12 +2030,10 @@ exports.vendorForgotPassword =
 // RESET PASSWORD
 // =====================================================
 //
-// Shared by user and vendor.
+// Shared by USER and VENDOR.
 //
-// The resetToken is generated only after successful
-// forgotPassword OTP verification.
-//
-// New password is ALWAYS bcrypt hashed.
+// OTP verification creates resetToken.
+// New password is bcrypt hashed.
 //
 // =====================================================
 
@@ -1807,6 +2043,7 @@ exports.resetPassword =
         res
     ) => {
         try {
+
             const {
                 resetToken,
                 newPassword
@@ -1843,6 +2080,7 @@ exports.resetPassword =
             let decoded;
 
             try {
+
                 decoded =
                     jwt.verify(
                         resetToken,
@@ -1888,7 +2126,7 @@ exports.resetPassword =
 
 
             // =================================================
-            // INVALIDATE OLD RESET TOKENS
+            // RESET TOKEN VERSION
             // =================================================
 
             if (
