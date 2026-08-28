@@ -5,8 +5,7 @@ const jwt = require("jsonwebtoken");
 const {
     User,
     Role,
-    UserRole,
-    VendorDetails
+    UserRole
 } = require("../models");
 
 const {
@@ -18,6 +17,11 @@ const {
 // HELPERS
 // =====================================================
 
+
+// -----------------------------------------------------
+// GENERATE OTP
+// -----------------------------------------------------
+
 const generateOTP = () => {
     return crypto
         .randomInt(
@@ -28,7 +32,12 @@ const generateOTP = () => {
 };
 
 
+// -----------------------------------------------------
+// OTP EXPIRY
+// -----------------------------------------------------
+
 const getOTPExpiry = () => {
+
     const minutes =
         Number(
             process.env.OTP_EXPIRY_MINUTES || 10
@@ -41,14 +50,28 @@ const getOTPExpiry = () => {
 };
 
 
-const normalizeEmail = (email) => {
+// -----------------------------------------------------
+// NORMALIZE EMAIL
+// -----------------------------------------------------
+
+const normalizeEmail = (
+    email
+) => {
+
     return email
         .trim()
         .toLowerCase();
 };
 
 
-const validatePassword = (password) => {
+// -----------------------------------------------------
+// PASSWORD VALIDATION
+// -----------------------------------------------------
+
+const validatePassword = (
+    password
+) => {
+
     return (
         typeof password === "string" &&
         password.length >= 8
@@ -57,13 +80,17 @@ const validatePassword = (password) => {
 
 
 // =====================================================
-// GET ROLE
+// GET ROLE BY NAME
 // =====================================================
 
-const getRoleByName = async (roleName) => {
+const getRoleByName = async (
+    roleName
+) => {
+
     return await Role.findOne({
         where: {
-            name: roleName
+            name:
+                roleName
         }
     });
 };
@@ -73,34 +100,35 @@ const getRoleByName = async (roleName) => {
 // GET USER ROLE ASSIGNMENTS
 // =====================================================
 //
-// Returns:
+// Reads roles through:
 //
-// [
-//     {
-//         role: "user",
-//         suspended: false
-//     },
-//     {
-//         role: "vendor",
-//         suspended: false
-//     }
-// ]
+// users
+//   ↓
+// user_roles
+//   ↓
+// roles
 //
 // =====================================================
 
 const getUserRoleAssignments = async (
     userId
 ) => {
+
     const assignments =
         await UserRole.findAll({
+
             where: {
                 userId
             },
 
             include: [
                 {
-                    model: Role,
-                    as: "role",
+                    model:
+                        Role,
+
+                    as:
+                        "role",
+
                     attributes: [
                         "id",
                         "name"
@@ -109,9 +137,14 @@ const getUserRoleAssignments = async (
             ]
         });
 
+
     return assignments.map(
-        (assignment) => {
+        (
+            assignment
+        ) => {
+
             return {
+
                 role:
                     assignment.role.name,
 
@@ -127,37 +160,37 @@ const getUserRoleAssignments = async (
 // GET ACTIVE ROLE NAMES
 // =====================================================
 //
-// IMPORTANT:
-//
-// Only roles where:
+// Only roles with:
 //
 // suspended = false
 //
-// are included in the JWT.
-//
-// JWT:
-//
-// {
-//     id: user.id,
-//     roles: ["user", "vendor"]
-// }
+// are included.
 //
 // =====================================================
 
 const getActiveRoleNames = async (
     userId
 ) => {
+
     const assignments =
         await UserRole.findAll({
+
             where: {
+
                 userId,
-                suspended: false
+
+                suspended:
+                    false
             },
 
             include: [
                 {
-                    model: Role,
-                    as: "role",
+                    model:
+                        Role,
+
+                    as:
+                        "role",
+
                     attributes: [
                         "name"
                     ]
@@ -165,8 +198,11 @@ const getActiveRoleNames = async (
             ]
         });
 
+
     return assignments.map(
-        (assignment) =>
+        (
+            assignment
+        ) =>
             assignment.role.name
     );
 };
@@ -188,12 +224,15 @@ const getActiveRoleNames = async (
 const createAccessToken = async (
     user
 ) => {
+
     const roles =
         await getActiveRoleNames(
             user.id
         );
 
+
     return jwt.sign(
+
         {
             id:
                 user.id,
@@ -211,20 +250,234 @@ const createAccessToken = async (
         }
     );
 };
+// =====================================================
+// GET CURRENT LOGGED-IN USER
+// =====================================================
+// GET /api/me
+exports.me = async (
+    req,
+    res
+) => {
+    try {
 
+        // =================================================
+        // AUTHENTICATION CHECK
+        // =================================================
+
+        if (!req.user) {
+            return res.status(401).json({
+                message:
+                    "Authentication required."
+            });
+        }
+
+
+        // =================================================
+        // USER ID
+        // =================================================
+
+        const userId =
+            req.user.id;
+
+
+        // =================================================
+        // CURRENT USER FROM DATABASE
+        // =================================================
+        //
+        // Do not rely only on the JWT for profile data.
+        //
+        // =================================================
+
+        const user =
+            await User.findByPk(
+                userId
+            );
+
+
+        if (!user) {
+            return res.status(404).json({
+                message:
+                    "User not found."
+            });
+        }
+
+
+        // =================================================
+        // CURRENT ROLE ASSIGNMENTS
+        // =================================================
+        //
+        // Read roles through:
+        //
+        // users
+        //    ↓
+        // user_roles
+        //    ↓
+        // roles
+        //
+        // =================================================
+
+        const roleAssignments =
+            await UserRole.findAll({
+
+                where: {
+                    userId:
+                        userId
+                },
+
+                include: [
+                    {
+                        model:
+                            Role,
+
+                        as:
+                            "role",
+
+                        attributes: [
+                            "id",
+                            "name"
+                        ]
+                    }
+                ]
+            });
+
+
+        // =================================================
+        // ACTIVE ROLES
+        // =================================================
+
+        const activeRoles =
+            roleAssignments
+                .filter(
+                    (
+                        assignment
+                    ) =>
+                        !assignment.suspended
+                )
+                .map(
+                    (
+                        assignment
+                    ) =>
+                        assignment.role.name
+                );
+
+
+        // =================================================
+        // ROLE ASSIGNMENTS
+        // =================================================
+
+        const roles =
+            roleAssignments.map(
+                (
+                    assignment
+                ) => {
+
+                    return {
+
+                        id:
+                            assignment.role.id,
+
+                        name:
+                            assignment.role.name,
+
+                        suspended:
+                            Boolean(
+                                assignment.suspended
+                            )
+                    };
+                }
+            );
+
+
+        // =================================================
+        // JWT TOKEN
+        // =================================================
+        //
+        // authenticate middleware should attach the
+        // original token to req.token.
+        //
+        // =================================================
+
+        const token =
+            req.token || null;
+
+
+        // =================================================
+        // RESPONSE
+        // =================================================
+
+        return res.status(200).json({
+
+            success:
+                true,
+
+            message:
+                "Current user details fetched successfully.",
+
+            token:
+
+                token,
+
+            user: {
+
+                id:
+                    user.id,
+
+                firstName:
+                    user.firstName,
+
+                lastName:
+                    user.lastName,
+
+                email:
+                    user.email,
+
+                isActive:
+                    user.isActive,
+
+                emailVerifiedAt:
+                    user.emailVerifiedAt,
+
+                roles:
+                    activeRoles,
+
+                roleAssignments:
+                    roles
+            }
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Get current user error:",
+            error
+        );
+
+        return res.status(500).json({
+
+            message:
+                "Internal server error."
+        });
+    }
+};
 
 // =====================================================
 // REGISTER NORMAL USER
 // =====================================================
 //
-// Public registration ONLY creates / assigns USER.
+// POST /api/auth/register
 //
-// Vendor cannot self-register as vendor.
+// Registration:
 //
-// If a vendor already exists with the same email:
-// - existing password must match
-// - USER role is added
-// - second users row is NOT created
+// users.isActive = false
+//
+// OTP is stored directly:
+//
+// users.otp
+// users.otpExpiry
+//
+// User role is assigned through:
+//
+// user_roles
 //
 // =====================================================
 
@@ -232,6 +485,7 @@ exports.register = async (
     req,
     res
 ) => {
+
     try {
 
         const {
@@ -252,7 +506,9 @@ exports.register = async (
             !email ||
             !password
         ) {
+
             return res.status(400).json({
+
                 message:
                     "First name, last name, email and password are required."
             });
@@ -264,12 +520,18 @@ exports.register = async (
                 password
             )
         ) {
+
             return res.status(400).json({
+
                 message:
                     "Password must contain at least 8 characters."
             });
         }
 
+
+        // =================================================
+        // NORMALIZE VALUES
+        // =================================================
 
         const normalizedFirstName =
             firstName.trim();
@@ -284,12 +546,14 @@ exports.register = async (
 
 
         // =================================================
-        // FIND EXISTING USER
+        // CHECK EXISTING USER
         // =================================================
 
         const existingUser =
             await User.findOne({
+
                 where: {
+
                     email:
                         normalizedEmail
                 }
@@ -300,7 +564,9 @@ exports.register = async (
         // EXISTING ACCOUNT
         // =================================================
 
-        if (existingUser) {
+        if (
+            existingUser
+        ) {
 
             const assignments =
                 await getUserRoleAssignments(
@@ -310,7 +576,9 @@ exports.register = async (
 
             const hasUserRole =
                 assignments.some(
-                    (assignment) =>
+                    (
+                        assignment
+                    ) =>
                         assignment.role ===
                         "user"
                 );
@@ -318,18 +586,24 @@ exports.register = async (
 
             const hasVendorRole =
                 assignments.some(
-                    (assignment) =>
+                    (
+                        assignment
+                    ) =>
                         assignment.role ===
                         "vendor"
                 );
 
 
             // ---------------------------------------------
-            // Existing USER
+            // EXISTING USER
             // ---------------------------------------------
 
-            if (hasUserRole) {
+            if (
+                hasUserRole
+            ) {
+
                 return res.status(409).json({
+
                     message:
                         "An account with this email already exists."
                 });
@@ -337,22 +611,30 @@ exports.register = async (
 
 
             // ---------------------------------------------
-            // Existing VENDOR
+            // EXISTING VENDOR
             //
-            // Add USER role to same identity.
+            // Same identity can become a USER.
             // ---------------------------------------------
 
-            if (hasVendorRole) {
+            if (
+                hasVendorRole
+            ) {
 
                 const passwordMatches =
                     await bcrypt.compare(
+
                         password,
+
                         existingUser.password
                     );
 
 
-                if (!passwordMatches) {
+                if (
+                    !passwordMatches
+                ) {
+
                     return res.status(401).json({
+
                         message:
                             "An account already exists with this email. Use the existing account password."
                     });
@@ -365,8 +647,12 @@ exports.register = async (
                     );
 
 
-                if (!userRole) {
+                if (
+                    !userRole
+                ) {
+
                     return res.status(500).json({
+
                         message:
                             "User role is not configured."
                     });
@@ -375,7 +661,9 @@ exports.register = async (
 
                 const existingUserRole =
                     await UserRole.findOne({
+
                         where: {
+
                             userId:
                                 existingUser.id,
 
@@ -385,9 +673,12 @@ exports.register = async (
                     });
 
 
-                if (!existingUserRole) {
+                if (
+                    !existingUserRole
+                ) {
 
                     await UserRole.create({
+
                         userId:
                             existingUser.id,
 
@@ -419,6 +710,7 @@ exports.register = async (
 
 
                 return res.status(200).json({
+
                     message:
                         "User role added successfully. You can use the same account as a customer and vendor."
                 });
@@ -426,6 +718,7 @@ exports.register = async (
 
 
             return res.status(409).json({
+
                 message:
                     "An account with this email already exists."
             });
@@ -442,8 +735,12 @@ exports.register = async (
             );
 
 
-        if (!userRole) {
+        if (
+            !userRole
+        ) {
+
             return res.status(500).json({
+
                 message:
                     "Default user role is not configured."
             });
@@ -539,12 +836,17 @@ exports.register = async (
         try {
 
             await sendOTP(
+
                 normalizedEmail,
+
                 otp,
+
                 "Verify Your Account"
             );
 
-        } catch (emailError) {
+        } catch (
+            emailError
+        ) {
 
             // User MUST remain in DB.
 
@@ -553,7 +855,9 @@ exports.register = async (
                 emailError
             );
 
+
             return res.status(201).json({
+
                 message:
                     "Account created successfully, but the verification email could not be sent. Please request a new OTP."
             });
@@ -561,18 +865,23 @@ exports.register = async (
 
 
         return res.status(201).json({
+
             message:
                 "Registration successful. Please verify your email using the OTP sent to your email."
         });
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
         console.error(
             "Register error:",
             error
         );
 
+
         return res.status(500).json({
+
             message:
                 "Internal server error."
         });
@@ -584,17 +893,17 @@ exports.register = async (
 // VERIFY OTP
 // =====================================================
 //
-// ONE ROUTE:
-//
 // POST /api/auth/verify-otp
+//
+// ONE endpoint.
 //
 // otpPurpose:
 //
 // emailVerification
 // forgotPassword
 //
-// OTP IS STORED DIRECTLY.
-// NO HASHING.
+// OTP is stored directly.
+// No hashing.
 //
 // =====================================================
 
@@ -602,6 +911,7 @@ exports.verifyOTP = async (
     req,
     res
 ) => {
+
     try {
 
         const {
@@ -620,7 +930,9 @@ exports.verifyOTP = async (
             !otp ||
             !otpPurpose
         ) {
+
             return res.status(400).json({
+
                 message:
                     "Email, OTP and otpPurpose are required."
             });
@@ -628,8 +940,11 @@ exports.verifyOTP = async (
 
 
         const allowedPurposes = [
+
             "emailVerification",
+
             "forgotPassword"
+
         ];
 
 
@@ -638,7 +953,9 @@ exports.verifyOTP = async (
                 otpPurpose
             )
         ) {
+
             return res.status(400).json({
+
                 message:
                     "Invalid otpPurpose. Allowed values: emailVerification, forgotPassword."
             });
@@ -651,17 +968,27 @@ exports.verifyOTP = async (
             );
 
 
+        // =================================================
+        // FIND USER
+        // =================================================
+
         const user =
             await User.findOne({
+
                 where: {
+
                     email:
                         normalizedEmail
                 }
             });
 
 
-        if (!user) {
+        if (
+            !user
+        ) {
+
             return res.status(404).json({
+
                 message:
                     "User not found."
             });
@@ -677,8 +1004,12 @@ exports.verifyOTP = async (
             "emailVerification"
         ) {
 
-            if (user.isActive) {
+            if (
+                user.isActive
+            ) {
+
                 return res.status(400).json({
+
                     message:
                         "Account is already verified."
                 });
@@ -689,39 +1020,56 @@ exports.verifyOTP = async (
                 !user.otp ||
                 !user.otpExpiry
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "No active verification OTP found."
                 });
             }
 
 
+            // ---------------------------------------------
+            // EXPIRY
+            // ---------------------------------------------
+
             if (
                 new Date() >
                 user.otpExpiry
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "OTP has expired. Please request a new OTP."
                 });
             }
 
 
+            // ---------------------------------------------
             // DIRECT OTP COMPARISON
+            // ---------------------------------------------
+
             if (
-                String(user.otp) !==
-                String(otp)
+                String(
+                    user.otp
+                ) !==
+                String(
+                    otp
+                )
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "Invalid OTP."
                 });
             }
 
 
-            // =================================================
+            // ---------------------------------------------
             // ACTIVATE ACCOUNT
-            // =================================================
+            // ---------------------------------------------
 
             user.isActive =
                 true;
@@ -739,9 +1087,9 @@ exports.verifyOTP = async (
             await user.save();
 
 
-            // =================================================
+            // ---------------------------------------------
             // ACTIVE ROLES
-            // =================================================
+            // ---------------------------------------------
 
             const roles =
                 await getActiveRoleNames(
@@ -749,9 +1097,9 @@ exports.verifyOTP = async (
                 );
 
 
-            // =================================================
+            // ---------------------------------------------
             // AUTO LOGIN
-            // =================================================
+            // ---------------------------------------------
 
             const token =
                 await createAccessToken(
@@ -760,12 +1108,14 @@ exports.verifyOTP = async (
 
 
             return res.status(200).json({
+
                 message:
                     "Email verified successfully. Login successful.",
 
                 token,
 
                 user: {
+
                     id:
                         user.id,
 
@@ -786,7 +1136,7 @@ exports.verifyOTP = async (
 
 
         // =================================================
-        // FORGOT PASSWORD OTP
+        // FORGOT PASSWORD
         // =================================================
 
         if (
@@ -794,8 +1144,12 @@ exports.verifyOTP = async (
             "forgotPassword"
         ) {
 
-            if (!user.isActive) {
+            if (
+                !user.isActive
+            ) {
+
                 return res.status(403).json({
+
                     message:
                         "Account is inactive. Please verify your email first."
                 });
@@ -806,7 +1160,9 @@ exports.verifyOTP = async (
                 !user.otp ||
                 !user.otpExpiry
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "No active password reset OTP found."
                 });
@@ -817,26 +1173,34 @@ exports.verifyOTP = async (
                 new Date() >
                 user.otpExpiry
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "OTP has expired."
                 });
             }
 
 
-            // DIRECT OTP COMPARISON
+            // Direct comparison
             if (
-                String(user.otp) !==
-                String(otp)
+                String(
+                    user.otp
+                ) !==
+                String(
+                    otp
+                )
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "Invalid OTP."
                 });
             }
 
 
-            // OTP cannot be reused.
+            // Consume OTP
             user.otp =
                 null;
 
@@ -848,11 +1212,12 @@ exports.verifyOTP = async (
 
 
             // =================================================
-            // CREATE PASSWORD RESET TOKEN
+            // PASSWORD RESET TOKEN
             // =================================================
 
             const resetToken =
                 jwt.sign(
+
                     {
                         id:
                             user.id,
@@ -875,6 +1240,7 @@ exports.verifyOTP = async (
 
 
             return res.status(200).json({
+
                 message:
                     "OTP verified successfully. You may now reset your password.",
 
@@ -882,14 +1248,18 @@ exports.verifyOTP = async (
             });
         }
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
         console.error(
             "Verify OTP error:",
             error
         );
 
+
         return res.status(500).json({
+
             message:
                 "Internal server error."
         });
@@ -898,7 +1268,13 @@ exports.verifyOTP = async (
 
 
 // =====================================================
-// RESEND USER REGISTRATION OTP
+// RESEND REGISTRATION OTP
+// =====================================================
+//
+// POST /api/auth/resend-verification
+//
+// No bearer token.
+//
 // =====================================================
 
 exports.resendVerificationOTP =
@@ -906,6 +1282,7 @@ exports.resendVerificationOTP =
         req,
         res
     ) => {
+
         try {
 
             const {
@@ -913,8 +1290,12 @@ exports.resendVerificationOTP =
             } = req.body;
 
 
-            if (!email) {
+            if (
+                !email
+            ) {
+
                 return res.status(400).json({
+
                     message:
                         "Email is required."
                 });
@@ -929,28 +1310,42 @@ exports.resendVerificationOTP =
 
             const user =
                 await User.findOne({
+
                     where: {
+
                         email:
                             normalizedEmail
                     }
                 });
 
 
-            if (!user) {
+            if (
+                !user
+            ) {
+
                 return res.status(404).json({
+
                     message:
                         "User not found."
                 });
             }
 
 
-            if (user.isActive) {
+            if (
+                user.isActive
+            ) {
+
                 return res.status(400).json({
+
                     message:
                         "Account is already verified."
                 });
             }
 
+
+            // =================================================
+            // GENERATE NEW OTP
+            // =================================================
 
             const otp =
                 generateOTP();
@@ -958,6 +1353,10 @@ exports.resendVerificationOTP =
             const otpExpiry =
                 getOTPExpiry();
 
+
+            // =================================================
+            // STORE OTP DIRECTLY
+            // =================================================
 
             user.otp =
                 otp;
@@ -969,26 +1368,38 @@ exports.resendVerificationOTP =
             await user.save();
 
 
+            // =================================================
+            // SEND OTP
+            // =================================================
+
             await sendOTP(
+
                 normalizedEmail,
+
                 otp,
+
                 "Your New Verification OTP"
             );
 
 
             return res.status(200).json({
+
                 message:
                     "A new verification OTP has been sent."
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "Resend OTP error:",
                 error
             );
 
+
             return res.status(500).json({
+
                 message:
                     "Internal server error."
             });
@@ -1004,7 +1415,8 @@ exports.resendVerificationOTP =
 //
 // Requires:
 //
-// USER role
+// user_roles
+// role = user
 // suspended = false
 //
 // =====================================================
@@ -1013,6 +1425,7 @@ exports.login = async (
     req,
     res
 ) => {
+
     try {
 
         const {
@@ -1021,11 +1434,17 @@ exports.login = async (
         } = req.body;
 
 
+        // =================================================
+        // VALIDATION
+        // =================================================
+
         if (
             !email ||
             !password
         ) {
+
             return res.status(400).json({
+
                 message:
                     "Email and password are required."
             });
@@ -1038,25 +1457,43 @@ exports.login = async (
             );
 
 
+        // =================================================
+        // FIND USER
+        // =================================================
+
         const user =
             await User.findOne({
+
                 where: {
+
                     email:
                         normalizedEmail
                 }
             });
 
 
-        if (!user) {
+        if (
+            !user
+        ) {
+
             return res.status(401).json({
+
                 message:
                     "Invalid email or password."
             });
         }
 
 
-        if (!user.isActive) {
+        // =================================================
+        // ACCOUNT STATUS
+        // =================================================
+
+        if (
+            !user.isActive
+        ) {
+
             return res.status(403).json({
+
                 message:
                     "Please verify your email before logging in."
             });
@@ -1064,7 +1501,7 @@ exports.login = async (
 
 
         // =================================================
-        // USER ROLE FROM user_roles
+        // USER ROLE
         // =================================================
 
         const userRole =
@@ -1073,17 +1510,27 @@ exports.login = async (
             );
 
 
-        if (!userRole) {
+        if (
+            !userRole
+        ) {
+
             return res.status(500).json({
+
                 message:
                     "User role is not configured."
             });
         }
 
 
+        // =================================================
+        // USER ROLE ASSIGNMENT
+        // =================================================
+
         const userAssignment =
             await UserRole.findOne({
+
                 where: {
+
                     userId:
                         user.id,
 
@@ -1096,8 +1543,12 @@ exports.login = async (
             });
 
 
-        if (!userAssignment) {
+        if (
+            !userAssignment
+        ) {
+
             return res.status(403).json({
+
                 message:
                     "Active user role is required."
             });
@@ -1110,13 +1561,19 @@ exports.login = async (
 
         const passwordMatch =
             await bcrypt.compare(
+
                 password,
+
                 user.password
             );
 
 
-        if (!passwordMatch) {
+        if (
+            !passwordMatch
+        ) {
+
             return res.status(401).json({
+
                 message:
                     "Invalid email or password."
             });
@@ -1144,12 +1601,14 @@ exports.login = async (
 
 
         return res.status(200).json({
+
             message:
                 "Login successful.",
 
             token,
 
             user: {
+
                 id:
                     user.id,
 
@@ -1167,14 +1626,18 @@ exports.login = async (
             }
         });
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
         console.error(
             "User login error:",
             error
         );
 
+
         return res.status(500).json({
+
             message:
                 "Internal server error."
         });
@@ -1190,11 +1653,11 @@ exports.login = async (
 //
 // Requires:
 //
-// SUPERADMIN role
+// user_roles
+// role = superadmin
 // suspended = false
 //
-// The superadmin does NOT need the USER role simply
-// to authenticate.
+// Superadmin does NOT need USER role.
 //
 // =====================================================
 
@@ -1202,6 +1665,7 @@ exports.adminLogin = async (
     req,
     res
 ) => {
+
     try {
 
         const {
@@ -1218,7 +1682,9 @@ exports.adminLogin = async (
             !email ||
             !password
         ) {
+
             return res.status(400).json({
+
                 message:
                     "Email and password are required."
             });
@@ -1237,15 +1703,21 @@ exports.adminLogin = async (
 
         const user =
             await User.findOne({
+
                 where: {
+
                     email:
                         normalizedEmail
                 }
             });
 
 
-        if (!user) {
+        if (
+            !user
+        ) {
+
             return res.status(401).json({
+
                 message:
                     "Invalid email or password."
             });
@@ -1256,8 +1728,12 @@ exports.adminLogin = async (
         // ACCOUNT STATUS
         // =================================================
 
-        if (!user.isActive) {
+        if (
+            !user.isActive
+        ) {
+
             return res.status(403).json({
+
                 message:
                     "Account is inactive."
             });
@@ -1265,7 +1741,7 @@ exports.adminLogin = async (
 
 
         // =================================================
-        // FIND SUPERADMIN ROLE
+        // SUPERADMIN ROLE
         // =================================================
 
         const superadminRole =
@@ -1274,8 +1750,12 @@ exports.adminLogin = async (
             );
 
 
-        if (!superadminRole) {
+        if (
+            !superadminRole
+        ) {
+
             return res.status(500).json({
+
                 message:
                     "Superadmin role is not configured."
             });
@@ -1283,16 +1763,14 @@ exports.adminLogin = async (
 
 
         // =================================================
-        // CHECK SUPERADMIN ASSIGNMENT
-        // =================================================
-        //
-        // MANDATORY user_roles CHECK
-        //
+        // SUPERADMIN ASSIGNMENT
         // =================================================
 
         const superadminAssignment =
             await UserRole.findOne({
+
                 where: {
+
                     userId:
                         user.id,
 
@@ -1305,8 +1783,12 @@ exports.adminLogin = async (
             });
 
 
-        if (!superadminAssignment) {
+        if (
+            !superadminAssignment
+        ) {
+
             return res.status(403).json({
+
                 message:
                     "Active superadmin role is required."
             });
@@ -1319,13 +1801,19 @@ exports.adminLogin = async (
 
         const passwordMatch =
             await bcrypt.compare(
+
                 password,
+
                 user.password
             );
 
 
-        if (!passwordMatch) {
+        if (
+            !passwordMatch
+        ) {
+
             return res.status(401).json({
+
                 message:
                     "Invalid email or password."
             });
@@ -1333,18 +1821,7 @@ exports.adminLogin = async (
 
 
         // =================================================
-        // GET ALL ACTIVE ROLES
-        // =================================================
-        //
-        // This preserves the multi-role JWT model.
-        //
-        // Example:
-        //
-        // {
-        //     id: 1,
-        //     roles: ["superadmin"]
-        // }
-        //
+        // ACTIVE ROLES
         // =================================================
 
         const roles =
@@ -1354,7 +1831,7 @@ exports.adminLogin = async (
 
 
         // =================================================
-        // CREATE JWT
+        // JWT
         // =================================================
 
         const token =
@@ -1363,17 +1840,15 @@ exports.adminLogin = async (
             );
 
 
-        // =================================================
-        // RESPONSE
-        // =================================================
-
         return res.status(200).json({
+
             message:
                 "Superadmin login successful.",
 
             token,
 
             user: {
+
                 id:
                     user.id,
 
@@ -1391,14 +1866,18 @@ exports.adminLogin = async (
             }
         });
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
         console.error(
             "Superadmin login error:",
             error
         );
 
+
         return res.status(500).json({
+
             message:
                 "Internal server error."
         });
@@ -1412,7 +1891,10 @@ exports.adminLogin = async (
 //
 // POST /api/user/forgot-password
 //
-// Requires active USER role.
+// OTP:
+//
+// users.otp
+// users.otpExpiry
 //
 // =====================================================
 
@@ -1421,6 +1903,7 @@ exports.forgotPassword =
         req,
         res
     ) => {
+
         try {
 
             const {
@@ -1428,8 +1911,12 @@ exports.forgotPassword =
             } = req.body;
 
 
-            if (!email) {
+            if (
+                !email
+            ) {
+
                 return res.status(400).json({
+
                     message:
                         "Email is required."
                 });
@@ -1442,25 +1929,43 @@ exports.forgotPassword =
                 );
 
 
+            // =================================================
+            // FIND USER
+            // =================================================
+
             const user =
                 await User.findOne({
+
                     where: {
+
                         email:
                             normalizedEmail
                     }
                 });
 
 
-            if (!user) {
+            if (
+                !user
+            ) {
+
                 return res.status(404).json({
+
                     message:
                         "User not found."
                 });
             }
 
 
-            if (!user.isActive) {
+            // =================================================
+            // ACTIVE ACCOUNT
+            // =================================================
+
+            if (
+                !user.isActive
+            ) {
+
                 return res.status(403).json({
+
                     message:
                         "Account is inactive."
                 });
@@ -1477,17 +1982,27 @@ exports.forgotPassword =
                 );
 
 
-            if (!userRole) {
+            if (
+                !userRole
+            ) {
+
                 return res.status(500).json({
+
                     message:
                         "User role is not configured."
                 });
             }
 
 
+            // =================================================
+            // ACTIVE USER ASSIGNMENT
+            // =================================================
+
             const userAssignment =
                 await UserRole.findOne({
+
                     where: {
+
                         userId:
                             user.id,
 
@@ -1500,8 +2015,12 @@ exports.forgotPassword =
                 });
 
 
-            if (!userAssignment) {
+            if (
+                !userAssignment
+            ) {
+
                 return res.status(403).json({
+
                     message:
                         "Active user role is required."
                 });
@@ -1519,6 +2038,10 @@ exports.forgotPassword =
                 getOTPExpiry();
 
 
+            // =================================================
+            // STORE OTP DIRECTLY
+            // =================================================
+
             user.otp =
                 otp;
 
@@ -1529,496 +2052,38 @@ exports.forgotPassword =
             await user.save();
 
 
+            // =================================================
+            // SEND OTP
+            // =================================================
+
             await sendOTP(
+
                 normalizedEmail,
+
                 otp,
+
                 "Password Reset OTP"
             );
 
 
             return res.status(200).json({
+
                 message:
                     "Password reset OTP has been sent to your email."
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "User forgot password error:",
                 error
             );
 
-            return res.status(500).json({
-                message:
-                    "Internal server error."
-            });
-        }
-    };
-
-
-// =====================================================
-// VENDOR LOGIN
-// =====================================================
-//
-// POST /api/vendor/login
-//
-// Requires:
-//
-// VENDOR role
-// suspended = false
-// correct password
-//
-// Then checks:
-//
-// vendor_details.hasAddress
-//
-// =====================================================
-
-exports.vendorLogin = async (
-    req,
-    res
-) => {
-    try {
-
-        const {
-            email,
-            password
-        } = req.body;
-
-
-        if (
-            !email ||
-            !password
-        ) {
-            return res.status(400).json({
-                message:
-                    "Email and password are required."
-            });
-        }
-
-
-        const normalizedEmail =
-            normalizeEmail(
-                email
-            );
-
-
-        // =================================================
-        // FIND USER
-        // =================================================
-
-        const user =
-            await User.findOne({
-                where: {
-                    email:
-                        normalizedEmail
-                }
-            });
-
-
-        if (!user) {
-            return res.status(401).json({
-                message:
-                    "Invalid email or password."
-            });
-        }
-
-
-        // =================================================
-        // ACCOUNT STATUS
-        // =================================================
-
-        if (!user.isActive) {
-            return res.status(403).json({
-                message:
-                    "Please verify your email before logging in."
-            });
-        }
-
-
-        // =================================================
-        // VENDOR ROLE
-        // =================================================
-
-        const vendorRole =
-            await getRoleByName(
-                "vendor"
-            );
-
-
-        if (!vendorRole) {
-            return res.status(500).json({
-                message:
-                    "Vendor role is not configured."
-            });
-        }
-
-
-        // =================================================
-        // VENDOR ASSIGNMENT
-        // =================================================
-
-        const vendorAssignment =
-            await UserRole.findOne({
-                where: {
-                    userId:
-                        user.id,
-
-                    roleId:
-                        vendorRole.id
-                }
-            });
-
-
-        if (!vendorAssignment) {
-            return res.status(403).json({
-                message:
-                    "Vendor role is required."
-            });
-        }
-
-
-        // =================================================
-        // SUSPENSION
-        // =================================================
-
-        if (
-            vendorAssignment.suspended
-        ) {
-            return res.status(403).json({
-                message:
-                    "Vendor account is suspended."
-            });
-        }
-
-
-        // =================================================
-        // PASSWORD
-        // =================================================
-
-        const passwordMatch =
-            await bcrypt.compare(
-                password,
-                user.password
-            );
-
-
-        if (!passwordMatch) {
-            return res.status(401).json({
-                message:
-                    "Invalid email or password."
-            });
-        }
-
-
-        // =================================================
-        // ACTIVE ROLES
-        // =================================================
-
-        const roles =
-            await getActiveRoleNames(
-                user.id
-            );
-
-
-        // =================================================
-        // JWT
-        // =================================================
-
-        const token =
-            await createAccessToken(
-                user
-            );
-
-
-        // =================================================
-        // FIND VENDOR DETAILS
-        // =================================================
-
-        let vendorDetails =
-            await VendorDetails.findOne({
-                where: {
-                    userId:
-                        user.id
-                }
-            });
-
-
-        // =================================================
-        // CREATE DEFAULT VENDOR DETAILS
-        // =================================================
-
-        if (!vendorDetails) {
-
-            vendorDetails =
-                await VendorDetails.create({
-                    userId:
-                        user.id,
-
-                    hasAddress:
-                        false
-                });
-        }
-
-
-        // =================================================
-        // ADDRESS EXISTS
-        // =================================================
-
-        if (
-            vendorDetails.hasAddress
-        ) {
-
-            return res.status(200).json({
-                success:
-                    true,
-
-                message:
-                    "Vendor login successful.",
-
-                token,
-
-                requiresAddress:
-                    false,
-
-                redirectTo:
-                    null,
-
-                user: {
-                    id:
-                        user.id,
-
-                    firstName:
-                        user.firstName,
-
-                    lastName:
-                        user.lastName,
-
-                    email:
-                        user.email,
-
-                    roles:
-                        roles
-                }
-            });
-        }
-
-
-        // =================================================
-        // ADDRESS MISSING
-        // =================================================
-
-        return res.status(200).json({
-            success:
-                true,
-
-            message:
-                "Login successful. Please complete your vendor address details.",
-
-            token,
-
-            requiresAddress:
-                true,
-
-            redirectTo:
-                "/vendor/address",
-
-            user: {
-                id:
-                    user.id,
-
-                firstName:
-                    user.firstName,
-
-                lastName:
-                    user.lastName,
-
-                email:
-                    user.email,
-
-                roles:
-                    roles
-            }
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Vendor login error:",
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                "Internal server error."
-        });
-    }
-};
-
-
-// =====================================================
-// VENDOR FORGOT PASSWORD
-// =====================================================
-//
-// POST /api/vendor/forgot-password
-//
-// Same OTP system:
-//
-// users.otp
-// users.otpExpiry
-//
-// Verification:
-//
-// POST /api/auth/verify-otp
-//
-// otpPurpose = forgotPassword
-//
-// =====================================================
-
-exports.vendorForgotPassword =
-    async (
-        req,
-        res
-    ) => {
-        try {
-
-            const {
-                email
-            } = req.body;
-
-
-            if (!email) {
-                return res.status(400).json({
-                    message:
-                        "Email is required."
-                });
-            }
-
-
-            const normalizedEmail =
-                normalizeEmail(
-                    email
-                );
-
-
-            const user =
-                await User.findOne({
-                    where: {
-                        email:
-                            normalizedEmail
-                    }
-                });
-
-
-            if (!user) {
-                return res.status(404).json({
-                    message:
-                        "User not found."
-                });
-            }
-
-
-            if (!user.isActive) {
-                return res.status(403).json({
-                    message:
-                        "Account is inactive."
-                });
-            }
-
-
-            // =================================================
-            // FIND VENDOR ROLE
-            // =================================================
-
-            const vendorRole =
-                await getRoleByName(
-                    "vendor"
-                );
-
-
-            if (!vendorRole) {
-                return res.status(500).json({
-                    message:
-                        "Vendor role is not configured."
-                });
-            }
-
-
-            const vendorAssignment =
-                await UserRole.findOne({
-                    where: {
-                        userId:
-                            user.id,
-
-                        roleId:
-                            vendorRole.id
-                    }
-                });
-
-
-            if (!vendorAssignment) {
-                return res.status(403).json({
-                    message:
-                        "Vendor role is required."
-                });
-            }
-
-
-            // =================================================
-            // SUSPENDED VENDOR
-            // =================================================
-
-            if (
-                vendorAssignment.suspended
-            ) {
-                return res.status(403).json({
-                    message:
-                        "Vendor account is suspended."
-                });
-            }
-
-
-            // =================================================
-            // GENERATE OTP
-            // =================================================
-
-            const otp =
-                generateOTP();
-
-            const otpExpiry =
-                getOTPExpiry();
-
-
-            user.otp =
-                otp;
-
-            user.otpExpiry =
-                otpExpiry;
-
-
-            await user.save();
-
-
-            await sendOTP(
-                normalizedEmail,
-                otp,
-                "Vendor Password Reset OTP"
-            );
-
-
-            return res.status(200).json({
-                message:
-                    "Password reset OTP has been sent to your email."
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Vendor forgot password error:",
-                error
-            );
 
             return res.status(500).json({
+
                 message:
                     "Internal server error."
             });
@@ -2030,10 +2095,15 @@ exports.vendorForgotPassword =
 // RESET PASSWORD
 // =====================================================
 //
-// Shared by USER and VENDOR.
+// POST /api/auth/reset-password
 //
-// OTP verification creates resetToken.
-// New password is bcrypt hashed.
+// Shared password-reset endpoint.
+//
+// Used after:
+//
+// POST /api/auth/verify-otp
+//
+// otpPurpose = forgotPassword
 //
 // =====================================================
 
@@ -2042,6 +2112,7 @@ exports.resetPassword =
         req,
         res
     ) => {
+
         try {
 
             const {
@@ -2050,11 +2121,17 @@ exports.resetPassword =
             } = req.body;
 
 
+            // =================================================
+            // VALIDATION
+            // =================================================
+
             if (
                 !resetToken ||
                 !newPassword
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "Reset token and new password are required."
                 });
@@ -2066,7 +2143,9 @@ exports.resetPassword =
                     newPassword
                 )
             ) {
+
                 return res.status(400).json({
+
                     message:
                         "Password must contain at least 8 characters."
                 });
@@ -2079,28 +2158,40 @@ exports.resetPassword =
 
             let decoded;
 
+
             try {
 
                 decoded =
                     jwt.verify(
+
                         resetToken,
+
                         process.env.JWT_SECRET
                     );
 
-            } catch (error) {
+            } catch (
+                error
+            ) {
 
                 return res.status(401).json({
+
                     message:
                         "Invalid or expired password reset token."
                 });
             }
 
 
+            // =================================================
+            // TOKEN PURPOSE
+            // =================================================
+
             if (
                 decoded.purpose !==
                 "password-reset"
             ) {
+
                 return res.status(401).json({
+
                     message:
                         "Invalid password reset token."
                 });
@@ -2117,8 +2208,12 @@ exports.resetPassword =
                 );
 
 
-            if (!user) {
+            if (
+                !user
+            ) {
+
                 return res.status(404).json({
+
                     message:
                         "User not found."
                 });
@@ -2133,7 +2228,9 @@ exports.resetPassword =
                 decoded.version !==
                 user.passwordResetVersion
             ) {
+
                 return res.status(401).json({
+
                     message:
                         "Password reset token is no longer valid."
                 });
@@ -2144,12 +2241,22 @@ exports.resetPassword =
             // HASH NEW PASSWORD
             // =================================================
 
-            user.password =
+            const hashedPassword =
                 await bcrypt.hash(
+
                     newPassword,
+
                     12
                 );
 
+
+            user.password =
+                hashedPassword;
+
+
+            // =================================================
+            // INVALIDATE OLD RESET TOKENS
+            // =================================================
 
             user.passwordResetVersion +=
                 1;
@@ -2159,18 +2266,23 @@ exports.resetPassword =
 
 
             return res.status(200).json({
+
                 message:
                     "Password reset successfully. You can now login."
             });
 
-        } catch (error) {
+        } catch (
+            error
+        ) {
 
             console.error(
                 "Reset password error:",
                 error
             );
 
+
             return res.status(500).json({
+
                 message:
                     "Internal server error."
             });

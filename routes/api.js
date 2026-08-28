@@ -15,8 +15,10 @@ const rbacController =
 
 const vendorController =
     require("../controller/vendorController");
+
 const loyaltyController =
     require("../controller/Loyalty_Controller");
+
 
 // =====================================================
 // MIDDLEWARE
@@ -31,21 +33,17 @@ const {
     authorizeSuperadmin
 } = require("../middleware/roleMiddleware");
 
-
 const uploadLoyaltyImage =
     require("../middleware/loyaltyUploadMiddleware");
-    
+
+
 // =====================================================
 // AUTH ROUTES
 // =====================================================
 
+
 // -----------------------------------------------------
-// REGISTER
-// -----------------------------------------------------
-//
-// Public user registration.
-// This creates a USER role through user_roles.
-//
+// USER REGISTRATION
 // -----------------------------------------------------
 
 router.post(
@@ -55,14 +53,13 @@ router.post(
 
 
 // -----------------------------------------------------
-// VERIFY OTP
+// UNIFIED OTP VERIFICATION
 // -----------------------------------------------------
 //
-// ONE OTP verification endpoint.
-//
 // otpPurpose:
-//     emailVerification
-//     forgotPassword
+//
+// emailVerification
+// forgotPassword
 //
 // -----------------------------------------------------
 
@@ -83,10 +80,10 @@ router.post(
 
 
 // -----------------------------------------------------
-// RESET PASSWORD
+// SHARED PASSWORD RESET
 // -----------------------------------------------------
 //
-// Shared by USER and VENDOR.
+// Used for the forgot-password flow.
 //
 // -----------------------------------------------------
 
@@ -95,6 +92,14 @@ router.post(
     authController.resetPassword
 );
 
+// =====================================================
+// CURRENT LOGGED-IN USER (ME-API)
+// =====================================================
+router.get(
+    "/me",
+    authenticate,
+    authController.me
+);
 
 // =====================================================
 // USER ROUTES
@@ -103,12 +108,6 @@ router.post(
 
 // -----------------------------------------------------
 // USER LOGIN
-// -----------------------------------------------------
-//
-// Requires an ACTIVE USER role.
-// The actual check happens inside authController.login()
-// using the user_roles junction table.
-//
 // -----------------------------------------------------
 
 router.post(
@@ -138,12 +137,15 @@ router.get(
     (req, res) => {
 
         return res.status(200).json({
-            success: true,
+
+            success:
+                true,
 
             message:
                 "User route accessed successfully.",
 
             user: {
+
                 id:
                     req.user.id,
 
@@ -173,57 +175,39 @@ router.get(
 // VENDOR LOGIN
 // -----------------------------------------------------
 //
-// Public endpoint.
-//
-// Vendor login controller verifies:
-//
-// 1. User exists
-// 2. Account is active
-// 3. Vendor role exists in user_roles
-// 4. Vendor suspended = false
-// 5. Password is correct
-//
-// It then checks vendor_details.has_address.
+// IMPORTANT:
+// Vendor login belongs to vendorController.
 //
 // -----------------------------------------------------
 
 router.post(
     "/vendor/login",
-    authController.vendorLogin
+    vendorController.login
 );
 
 
 // -----------------------------------------------------
-// VENDOR FORGOT PASSWORD
+// VENDOR CHANGE PASSWORD
 // -----------------------------------------------------
 //
-// Generates the SAME OTP used by the rest of the
-// authentication system.
+// Vendor must already be logged in.
 //
-// Verification:
+// Bearer token required.
 //
-// POST /api/auth/verify-otp
-//
-// otpPurpose = "forgotPassword"
+// No OTP.
 //
 // -----------------------------------------------------
 
-router.post(
-    "/vendor/forgot-password",
-    authController.vendorForgotPassword
+router.patch(
+    "/vendor/change-password",
+    authenticate,
+    authorizeVendor,
+    vendorController.changeVendorPassword
 );
 
 
 // -----------------------------------------------------
 // VENDOR PROFILE
-// -----------------------------------------------------
-//
-// Requires:
-//
-// vendor role
-// AND
-// suspended = false
-//
 // -----------------------------------------------------
 
 router.get(
@@ -233,12 +217,15 @@ router.get(
     (req, res) => {
 
         return res.status(200).json({
-            success: true,
+
+            success:
+                true,
 
             message:
                 "Vendor route accessed successfully.",
 
             user: {
+
                 id:
                     req.user.id,
 
@@ -261,12 +248,6 @@ router.get(
 
 // -----------------------------------------------------
 // SAVE / UPDATE VENDOR ADDRESS
-// -----------------------------------------------------
-//
-// Requires an ACTIVE vendor role.
-//
-// Address is stored in vendor_details.
-//
 // -----------------------------------------------------
 
 router.post(
@@ -292,15 +273,10 @@ router.get(
 // =====================================================
 // ADMIN / SUPERADMIN ROUTES
 // =====================================================
-//
-// Public authentication endpoint.
-//
-// Controller verifies:
-//
-// superadmin role exists
-// suspended = false
-// password correct
-//
+
+
+// -----------------------------------------------------
+// SUPERADMIN LOGIN
 // -----------------------------------------------------
 
 router.post(
@@ -308,19 +284,9 @@ router.post(
     authController.adminLogin
 );
 
+
 // -----------------------------------------------------
 // APPOINT USER AS VENDOR
-// -----------------------------------------------------
-//
-// ONLY SUPERADMIN.
-//
-// Creates:
-//
-// user_roles
-//     user_id
-//     role_id = vendor
-//     suspended = false
-//
 // -----------------------------------------------------
 
 router.post(
@@ -334,22 +300,6 @@ router.post(
 // -----------------------------------------------------
 // SUSPEND VENDOR
 // -----------------------------------------------------
-//
-// ONLY SUPERADMIN.
-//
-// Important:
-//
-// This does NOT delete:
-//
-// - users row
-// - user_roles row
-// - vendor_details row
-//
-// It only changes:
-//
-// vendor user_roles.suspended = true
-//
-// -----------------------------------------------------
 
 router.patch(
     "/admin/users/:userId/vendor/suspend",
@@ -362,18 +312,6 @@ router.patch(
 // -----------------------------------------------------
 // ACTIVATE VENDOR
 // -----------------------------------------------------
-//
-// ONLY SUPERADMIN.
-//
-// Changes:
-//
-// suspended = true
-//
-// to:
-//
-// suspended = false
-//
-// -----------------------------------------------------
 
 router.patch(
     "/admin/users/:userId/vendor/activate",
@@ -382,11 +320,16 @@ router.patch(
     rbacController.activateVendor
 );
 
+
 // =====================================================
 // LOYALTY PROGRAM ROUTES
 // =====================================================
 
-// Create loyalty program
+
+// -----------------------------------------------------
+// CREATE LOYALTY PROGRAM
+// -----------------------------------------------------
+
 router.post(
     "/vendor/loyalty-programs",
     authenticate,
@@ -396,7 +339,10 @@ router.post(
 );
 
 
-// Get 5 most recent loyalty programs
+// -----------------------------------------------------
+// GET RECENT LOYALTY PROGRAMS
+// -----------------------------------------------------
+
 router.get(
     "/vendor/loyalty-programs/recent",
     authenticate,
@@ -405,12 +351,16 @@ router.get(
 );
 
 
-// Get all loyalty programs belonging to logged-in vendor
+// -----------------------------------------------------
+// GET ALL LOYALTY PROGRAMS
+// -----------------------------------------------------
+
 router.get(
     "/vendor/loyalty-programs",
     authenticate,
     authorizeVendor,
     loyaltyController.getAllLoyaltyPrograms
 );
+
 
 module.exports = router;

@@ -8,39 +8,15 @@ const {
     VendorDetails
 } = require("../models");
 
-const {
-    sendOTP
-} = require("../services/emailService");
-
 
 // =====================================================
 // HELPERS
 // =====================================================
 
 const normalizeEmail = (email) => {
-    return email.trim().toLowerCase();
-};
-
-
-const generateOTP = () => {
-    const crypto = require("crypto");
-
-    return crypto
-        .randomInt(100000, 1000000)
-        .toString();
-};
-
-
-const getOTPExpiry = () => {
-    const minutes =
-        Number(
-            process.env.OTP_EXPIRY_MINUTES || 10
-        );
-
-    return new Date(
-        Date.now() +
-        minutes * 60 * 1000
-    );
+    return email
+        .trim()
+        .toLowerCase();
 };
 
 
@@ -50,12 +26,20 @@ const getOTPExpiry = () => {
 //
 // POST /api/vendor/login
 //
-// Body:
+// Requirements:
 //
-// {
-//     "email": "vendor@example.com",
-//     "password": "password123"
-// }
+// 1. User exists
+// 2. Account is active
+// 3. Vendor role exists in user_roles
+// 4. Vendor suspended = false
+// 5. Password is correct
+//
+// Then:
+//
+// vendor_details.hasAddress
+//
+// true  -> normal login
+// false -> requiresAddress = true
 //
 // =====================================================
 
@@ -64,13 +48,21 @@ exports.login = async (
     res
 ) => {
     try {
+
         const {
             email,
             password
         } = req.body;
 
 
-        if (!email || !password) {
+        // =================================================
+        // VALIDATION
+        // =================================================
+
+        if (
+            !email ||
+            !password
+        ) {
             return res.status(400).json({
                 message:
                     "Email and password are required."
@@ -79,7 +71,9 @@ exports.login = async (
 
 
         const normalizedEmail =
-            normalizeEmail(email);
+            normalizeEmail(
+                email
+            );
 
 
         // =================================================
@@ -104,13 +98,26 @@ exports.login = async (
 
 
         // =================================================
-        // LOAD VENDOR ROLE ASSIGNMENT
+        // ACCOUNT STATUS
+        // =================================================
+
+        if (!user.isActive) {
+            return res.status(403).json({
+                message:
+                    "Please verify your email before logging in."
+            });
+        }
+
+
+        // =================================================
+        // FIND VENDOR ROLE
         // =================================================
 
         const vendorRole =
             await Role.findOne({
                 where: {
-                    name: "vendor"
+                    name:
+                        "vendor"
                 }
             });
 
@@ -122,6 +129,14 @@ exports.login = async (
             });
         }
 
+
+        // =================================================
+        // FIND VENDOR ASSIGNMENT
+        // =================================================
+        //
+        // MANDATORY user_roles CHECK
+        //
+        // =================================================
 
         const vendorAssignment =
             await UserRole.findOne({
@@ -136,7 +151,7 @@ exports.login = async (
 
 
         // =================================================
-        // USER IS NOT A VENDOR
+        // NOT A VENDOR
         // =================================================
 
         if (!vendorAssignment) {
@@ -148,7 +163,7 @@ exports.login = async (
 
 
         // =================================================
-        // VENDOR SUSPENDED
+        // SUSPENDED VENDOR
         // =================================================
 
         if (
@@ -157,18 +172,6 @@ exports.login = async (
             return res.status(403).json({
                 message:
                     "Vendor account is suspended."
-            });
-        }
-
-
-        // =================================================
-        // USER ACCOUNT STATUS
-        // =================================================
-
-        if (!user.isActive) {
-            return res.status(403).json({
-                message:
-                    "Account is inactive. Please verify your email."
             });
         }
 
@@ -193,7 +196,7 @@ exports.login = async (
 
 
         // =================================================
-        // LOAD ALL ACTIVE ROLES
+        // LOAD ACTIVE ROLES
         // =================================================
 
         const roleAssignments =
@@ -224,7 +227,7 @@ exports.login = async (
 
         const roles =
             roleAssignments.map(
-                assignment =>
+                (assignment) =>
                     assignment.role.name
             );
 
@@ -267,14 +270,11 @@ exports.login = async (
 
 
         // =================================================
-        // CREATE VENDOR DETAILS IF MISSING
+        // CREATE DEFAULT VENDOR DETAILS
         // =================================================
-        //
-        // This protects existing vendors created before
-        // vendor_details was introduced.
-        //
 
         if (!vendorDetails) {
+
             vendorDetails =
                 await VendorDetails.create({
                     userId:
@@ -287,13 +287,15 @@ exports.login = async (
 
 
         // =================================================
-        // HAS ADDRESS
+        // ADDRESS EXISTS
         // =================================================
 
         if (
             vendorDetails.hasAddress
         ) {
+
             return res.status(200).json({
+
                 success:
                     true,
 
@@ -305,7 +307,11 @@ exports.login = async (
                 requiresAddress:
                     false,
 
+                redirectTo:
+                    null,
+
                 user: {
+
                     id:
                         user.id,
 
@@ -326,10 +332,11 @@ exports.login = async (
 
 
         // =================================================
-        // NO ADDRESS
+        // ADDRESS DOES NOT EXIST
         // =================================================
 
         return res.status(200).json({
+
             success:
                 true,
 
@@ -345,6 +352,7 @@ exports.login = async (
                 "/vendor/address",
 
             user: {
+
                 id:
                     user.id,
 
@@ -363,6 +371,7 @@ exports.login = async (
         });
 
     } catch (error) {
+
         console.error(
             "Vendor login error:",
             error
@@ -382,15 +391,7 @@ exports.login = async (
 //
 // POST /api/vendor/address
 //
-// Body:
-//
-// {
-//     "streetAddress": "123 Park Street",
-//     "city": "Kolkata",
-//     "country": "India",
-//     "state": "West Bengal",
-//     "pinCode": "700016"
-// }
+// Requires authenticated active vendor.
 //
 // =====================================================
 
@@ -399,6 +400,7 @@ exports.saveAddress = async (
     res
 ) => {
     try {
+
         const {
             streetAddress,
             city,
@@ -426,12 +428,16 @@ exports.saveAddress = async (
         }
 
 
+        // =================================================
+        // USER ID FROM JWT
+        // =================================================
+
         const userId =
             req.user.id;
 
 
         // =================================================
-        // VERIFY ACTIVE VENDOR
+        // FIND VENDOR ROLE
         // =================================================
 
         const vendorRole =
@@ -450,6 +456,10 @@ exports.saveAddress = async (
             });
         }
 
+
+        // =================================================
+        // ACTIVE VENDOR
+        // =================================================
 
         const vendorAssignment =
             await UserRole.findOne({
@@ -488,12 +498,14 @@ exports.saveAddress = async (
 
 
         // =================================================
-        // CREATE OR UPDATE
+        // CREATE
         // =================================================
 
         if (!vendorDetails) {
+
             vendorDetails =
                 await VendorDetails.create({
+
                     userId:
                         userId,
 
@@ -518,6 +530,10 @@ exports.saveAddress = async (
 
         } else {
 
+            // =============================================
+            // UPDATE
+            // =============================================
+
             vendorDetails.streetAddress =
                 streetAddress.trim();
 
@@ -536,11 +552,17 @@ exports.saveAddress = async (
             vendorDetails.hasAddress =
                 true;
 
+
             await vendorDetails.save();
         }
 
 
+        // =================================================
+        // RESPONSE
+        // =================================================
+
         return res.status(200).json({
+
             success:
                 true,
 
@@ -548,6 +570,7 @@ exports.saveAddress = async (
                 "Vendor address saved successfully.",
 
             vendorDetails: {
+
                 hasAddress:
                     vendorDetails.hasAddress,
 
@@ -569,6 +592,7 @@ exports.saveAddress = async (
         });
 
     } catch (error) {
+
         console.error(
             "Save vendor address error:",
             error
@@ -585,12 +609,17 @@ exports.saveAddress = async (
 // =====================================================
 // GET VENDOR ADDRESS
 // =====================================================
+//
+// GET /api/vendor/address
+//
+// =====================================================
 
 exports.getAddress = async (
     req,
     res
 ) => {
     try {
+
         const vendorDetails =
             await VendorDetails.findOne({
                 where: {
@@ -601,7 +630,9 @@ exports.getAddress = async (
 
 
         if (!vendorDetails) {
+
             return res.status(200).json({
+
                 hasAddress:
                     false,
 
@@ -612,10 +643,12 @@ exports.getAddress = async (
 
 
         return res.status(200).json({
+
             hasAddress:
                 vendorDetails.hasAddress,
 
             vendorDetails: {
+
                 streetAddress:
                     vendorDetails.streetAddress,
 
@@ -634,6 +667,7 @@ exports.getAddress = async (
         });
 
     } catch (error) {
+
         console.error(
             "Get vendor address error:",
             error
@@ -648,52 +682,92 @@ exports.getAddress = async (
 
 
 // =====================================================
-// VENDOR FORGOT PASSWORD
+// VENDOR CHANGE PASSWORD
 // =====================================================
 //
-// POST /api/vendor/forgot-password
+// PATCH /api/vendor/change-password
 //
-// This uses the SAME OTP storage:
+// Vendor must already be logged in.
 //
-// users.otp
-// users.otpExpiry
+// Authorization:
+// Bearer <vendor JWT>
 //
-// No hashing is used for the OTP.
+// Body:
+//
+// {
+//     "newPassword": "NewPassword123"
+// }
+//
+// IMPORTANT:
+//
+// User ID comes from:
+//
+// req.user.id
+//
+// No:
+// - email
+// - userId
+// - OTP
+// - resetToken
 //
 // =====================================================
 
-exports.forgotPassword = async (
+exports.changeVendorPassword = async (
     req,
     res
 ) => {
     try {
+
         const {
-            email
+            newPassword
         } = req.body;
 
 
-        if (!email) {
+        // =================================================
+        // VALIDATION
+        // =================================================
+
+        if (!newPassword) {
+
             return res.status(400).json({
                 message:
-                    "Email is required."
+                    "New password is required."
             });
         }
 
 
-        const normalizedEmail =
-            normalizeEmail(email);
+        if (
+            typeof newPassword !== "string" ||
+            newPassword.length < 8
+        ) {
 
+            return res.status(400).json({
+                message:
+                    "Password must contain at least 8 characters."
+            });
+        }
+
+
+        // =================================================
+        // USER ID FROM JWT
+        // =================================================
+
+        const userId =
+            req.user.id;
+
+
+        // =================================================
+        // FIND USER
+        // =================================================
 
         const user =
-            await User.findOne({
-                where: {
-                    email:
-                        normalizedEmail
-                }
-            });
+            await User.findByPk(
+                userId
+            );
 
 
         if (!user) {
+
             return res.status(404).json({
                 message:
                     "User not found."
@@ -701,7 +775,12 @@ exports.forgotPassword = async (
         }
 
 
+        // =================================================
+        // ACCOUNT STATUS
+        // =================================================
+
         if (!user.isActive) {
+
             return res.status(403).json({
                 message:
                     "Account is inactive."
@@ -710,7 +789,7 @@ exports.forgotPassword = async (
 
 
         // =================================================
-        // CHECK VENDOR ROLE
+        // FIND VENDOR ROLE
         // =================================================
 
         const vendorRole =
@@ -723,6 +802,7 @@ exports.forgotPassword = async (
 
 
         if (!vendorRole) {
+
             return res.status(500).json({
                 message:
                     "Vendor role is not configured."
@@ -730,11 +810,16 @@ exports.forgotPassword = async (
         }
 
 
+        // =================================================
+        // ACTIVE VENDOR ASSIGNMENT
+        // =================================================
+
         const vendorAssignment =
             await UserRole.findOne({
                 where: {
+
                     userId:
-                        user.id,
+                        userId,
 
                     roleId:
                         vendorRole.id,
@@ -746,6 +831,7 @@ exports.forgotPassword = async (
 
 
         if (!vendorAssignment) {
+
             return res.status(403).json({
                 message:
                     "Active vendor role is required."
@@ -754,49 +840,44 @@ exports.forgotPassword = async (
 
 
         // =================================================
-        // GENERATE OTP
+        // HASH NEW PASSWORD
         // =================================================
 
-        const otp =
-            generateOTP();
-
-        const otpExpiry =
-            getOTPExpiry();
+        const hashedPassword =
+            await bcrypt.hash(
+                newPassword,
+                12
+            );
 
 
         // =================================================
-        // STORE OTP DIRECTLY
+        // SAVE
         // =================================================
 
-        user.otp =
-            otp;
-
-        user.otpExpiry =
-            otpExpiry;
+        user.password =
+            hashedPassword;
 
 
         await user.save();
 
 
         // =================================================
-        // SEND OTP
+        // RESPONSE
         // =================================================
 
-        await sendOTP(
-            normalizedEmail,
-            otp,
-            "Vendor Password Reset OTP"
-        );
-
-
         return res.status(200).json({
+
+            success:
+                true,
+
             message:
-                "Password reset OTP has been sent to your email."
+                "Vendor password changed successfully."
         });
 
     } catch (error) {
+
         console.error(
-            "Vendor forgot password error:",
+            "Vendor change password error:",
             error
         );
 

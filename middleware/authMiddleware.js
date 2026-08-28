@@ -82,16 +82,16 @@ const authenticate = async (
 
         const token =
             authHeader.substring(7);
-
-
+        
+    
         if (!token) {
             return res.status(401).json({
                 message:
                     "Authorization token is required."
             });
         }
-
-
+        // SAVE ORIGINAL TOKEN
+        req.token = token; 
         // =================================================
         // 4. VERIFY JWT
         // =================================================
