@@ -30,7 +30,7 @@ const LoyaltyProgram = sequelize.define(
         },
 
         // =================================================
-        // BASIC PROGRAM INFORMATION
+        // PROGRAM
         // =================================================
 
         programName: {
@@ -44,10 +44,6 @@ const LoyaltyProgram = sequelize.define(
             allowNull: false,
             field: "required_star_collection"
         },
-
-        // =================================================
-        // QR CODE SCAN INTERVAL
-        // =================================================
 
         qrCodeScanIntervalValue: {
             type: DataTypes.INTEGER,
@@ -65,10 +61,6 @@ const LoyaltyProgram = sequelize.define(
             field: "qr_code_scan_interval_unit"
         },
 
-        // =================================================
-        // PROGRAM RULES
-        // =================================================
-
         programRules: {
             type: DataTypes.TEXT,
             allowNull: true,
@@ -76,7 +68,7 @@ const LoyaltyProgram = sequelize.define(
         },
 
         // =================================================
-        // NOTIFICATION
+        // NOTIFICATION SETTINGS
         // =================================================
 
         notificationEnabled: {
@@ -86,18 +78,13 @@ const LoyaltyProgram = sequelize.define(
             field: "notification_enabled"
         },
 
-        // "If No. of Star"
+        // Example: STAR_COUNT
         notificationStarField: {
             type: DataTypes.STRING(50),
             allowNull: true,
-            defaultValue: "STAR_COUNT",
             field: "notification_star_field"
         },
 
-        // Example:
-        // LESS_THAN
-        // GREATER_THAN
-        // EQUAL_TO
         notificationConditionOperator: {
             type: DataTypes.ENUM(
                 "LESS_THAN",
@@ -110,11 +97,6 @@ const LoyaltyProgram = sequelize.define(
             field: "notification_condition_operator"
         },
 
-        // Example:
-        // EQUAL_TO
-        // NOT_EQUAL_TO
-        // LESS_THAN
-        // GREATER_THAN
         notificationComparisonOperator: {
             type: DataTypes.ENUM(
                 "EQUAL_TO",
@@ -128,22 +110,18 @@ const LoyaltyProgram = sequelize.define(
             field: "notification_comparison_operator"
         },
 
-        // "Required Star"
         notificationComparisonValue: {
             type: DataTypes.INTEGER,
             allowNull: true,
             field: "notification_comparison_value"
         },
 
-        // "Send Notification"
         notificationAction: {
             type: DataTypes.STRING(100),
             allowNull: true,
-            defaultValue: "SEND_NOTIFICATION",
             field: "notification_action"
         },
 
-        // "Select Template"
         notificationTemplate: {
             type: DataTypes.STRING(255),
             allowNull: true,
@@ -161,6 +139,7 @@ const LoyaltyProgram = sequelize.define(
             field: "enable_pin_verification"
         }
     },
+
     {
         tableName: "loyalty_programs",
         timestamps: true,
@@ -168,7 +147,8 @@ const LoyaltyProgram = sequelize.define(
         indexes: [
             {
                 fields: ["vendor_id"],
-                name: "loyalty_programs_vendor_id_index"
+                name:
+                    "loyalty_programs_vendor_id_index"
             }
         ]
     }

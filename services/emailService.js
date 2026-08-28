@@ -1,16 +1,38 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
+
+// =====================================================
+// SMTP TRANSPORTER
+// =====================================================
+
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === "true",
+
+    port:
+        Number(
+            process.env.SMTP_PORT || 465
+        ),
+
+    secure:
+        process.env.SMTP_SECURE === "true",
+
+    // Force IPv4
+    family: 4,
 
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user:
+            process.env.SMTP_USER,
+
+        pass:
+            process.env.SMTP_PASS
     }
 });
+
+
+// =====================================================
+// SEND OTP
+// =====================================================
 
 const sendOTP = async (
     to,
@@ -27,9 +49,9 @@ const sendOTP = async (
         subject,
 
         text:
-            `Your OTP is ${otp}. ` +
-            `It is valid for ` +
-            `${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`,
+            `Your OTP is ${otp}. It is valid for ${
+                process.env.OTP_EXPIRY_MINUTES || 10
+            } minutes.`,
 
         html: `
             <div style="font-family: Arial, sans-serif;">
@@ -60,6 +82,11 @@ const sendOTP = async (
     );
 };
 
+
+// =====================================================
+// VERIFY SMTP CONNECTION
+// =====================================================
+
 const verifySMTPConnection = async () => {
     await transporter.verify();
 
@@ -67,6 +94,7 @@ const verifySMTPConnection = async () => {
         "SMTP connection verified."
     );
 };
+
 
 module.exports = {
     sendOTP,

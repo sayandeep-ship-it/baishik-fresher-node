@@ -15,22 +15,39 @@ async function createLoyaltyProgram(
 
         const {
             programName,
+
             requiredStarCollection,
+
             qrCodeScanIntervalValue,
+
             qrCodeScanIntervalUnit,
+
             programRules,
 
-            // Notification
+            // =================================================
+            // NOTIFICATION
+            // =================================================
+
             notificationEnabled,
+
             notificationStarField,
+
             notificationConditionOperator,
+
             notificationComparisonOperator,
+
             notificationComparisonValue,
+
             notificationAction,
+
             notificationTemplate,
 
-            // Pin verification
+            // =================================================
+            // PIN
+            // =================================================
+
             enablePinVerification
+
         } = req.body || {};
 
 
@@ -132,7 +149,7 @@ async function createLoyaltyProgram(
 
 
         // =================================================
-        // INTERVAL UNIT VALIDATION
+        // INTERVAL UNIT
         // =================================================
 
         const allowedUnits = [
@@ -164,16 +181,19 @@ async function createLoyaltyProgram(
         // IMAGE
         // =================================================
 
-        let imagePath = null;
+        let imagePath =
+            null;
+
 
         if (req.file) {
+
             imagePath =
                 `/uploads/loyalty/${req.file.filename}`;
         }
 
 
         // =================================================
-        // NOTIFICATION
+        // NOTIFICATION SETTINGS
         // =================================================
 
         const isNotificationEnabled =
@@ -181,39 +201,161 @@ async function createLoyaltyProgram(
             notificationEnabled === "true";
 
 
+        // =================================================
+        // DEFAULT VALUES
+        // =================================================
+        //
+        // Everything is NULL until notificationEnabled
+        // is explicitly enabled.
+        //
+        // =================================================
+
         let notificationStarFieldValue =
-            notificationStarField ||
-            "STAR_COUNT";
+            null;
 
         let notificationConditionOperatorValue =
-            notificationConditionOperator
-                ? String(
-                    notificationConditionOperator
-                ).toUpperCase()
-                : null;
+            null;
 
         let notificationComparisonOperatorValue =
-            notificationComparisonOperator
-                ? String(
-                    notificationComparisonOperator
-                ).toUpperCase()
-                : null;
+            null;
 
         let notificationComparisonValueNumber =
             null;
 
+        let notificationActionValue =
+            null;
+
+        let notificationTemplateValue =
+            null;
+
+
+        // =================================================
+        // NOTIFICATION ENABLED
+        // =================================================
 
         if (
-            notificationComparisonValue !==
-                undefined &&
-            notificationComparisonValue !==
-                null &&
-            notificationComparisonValue !== ""
+            isNotificationEnabled
         ) {
+
+            // ---------------------------------------------
+            // STAR FIELD
+            // ---------------------------------------------
+
+            notificationStarFieldValue =
+                notificationStarField
+                    ? String(
+                        notificationStarField
+                    ).trim()
+                    : "STAR_COUNT";
+
+
+            // ---------------------------------------------
+            // CONDITION OPERATOR
+            // ---------------------------------------------
+
+            if (
+                !notificationConditionOperator
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Notification condition operator is required when notifications are enabled"
+                });
+            }
+
+
+            notificationConditionOperatorValue =
+                String(
+                    notificationConditionOperator
+                ).toUpperCase();
+
+
+            const allowedConditionOperators = [
+                "LESS_THAN",
+                "GREATER_THAN",
+                "EQUAL_TO",
+                "LESS_THAN_OR_EQUAL",
+                "GREATER_THAN_OR_EQUAL"
+            ];
+
+
+            if (
+                !allowedConditionOperators.includes(
+                    notificationConditionOperatorValue
+                )
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Invalid notification condition operator"
+                });
+            }
+
+
+            // ---------------------------------------------
+            // COMPARISON OPERATOR
+            // ---------------------------------------------
+
+            if (
+                !notificationComparisonOperator
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Notification comparison operator is required when notifications are enabled"
+                });
+            }
+
+
+            notificationComparisonOperatorValue =
+                String(
+                    notificationComparisonOperator
+                ).toUpperCase();
+
+
+            const allowedComparisonOperators = [
+                "EQUAL_TO",
+                "NOT_EQUAL_TO",
+                "LESS_THAN",
+                "GREATER_THAN",
+                "LESS_THAN_OR_EQUAL",
+                "GREATER_THAN_OR_EQUAL"
+            ];
+
+
+            if (
+                !allowedComparisonOperators.includes(
+                    notificationComparisonOperatorValue
+                )
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Invalid notification comparison operator"
+                });
+            }
+
+
+            // ---------------------------------------------
+            // COMPARISON VALUE
+            // ---------------------------------------------
+
+            if (
+                notificationComparisonValue ===
+                    undefined ||
+                notificationComparisonValue ===
+                    null ||
+                notificationComparisonValue ===
+                    ""
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Notification comparison value is required when notifications are enabled"
+                });
+            }
+
+
             notificationComparisonValueNumber =
                 Number(
                     notificationComparisonValue
                 );
+
 
             if (
                 !Number.isInteger(
@@ -226,43 +368,11 @@ async function createLoyaltyProgram(
                         "Notification comparison value must be a non-negative integer"
                 });
             }
-        }
 
 
-        if (
-            isNotificationEnabled
-        ) {
-
-            if (
-                !notificationConditionOperatorValue
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Notification condition operator is required when notifications are enabled"
-                });
-            }
-
-
-            if (
-                !notificationComparisonOperatorValue
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Notification comparison operator is required when notifications are enabled"
-                });
-            }
-
-
-            if (
-                notificationComparisonValueNumber ===
-                null
-            ) {
-                return res.status(400).json({
-                    message:
-                        "Notification comparison value is required when notifications are enabled"
-                });
-            }
-
+            // ---------------------------------------------
+            // ACTION
+            // ---------------------------------------------
 
             if (
                 !notificationAction
@@ -272,20 +382,61 @@ async function createLoyaltyProgram(
                         "Notification action is required when notifications are enabled"
                 });
             }
+
+
+            notificationActionValue =
+                String(
+                    notificationAction
+                ).trim();
+
+
+            // ---------------------------------------------
+            // TEMPLATE
+            // ---------------------------------------------
+
+            if (
+                !notificationTemplate
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Notification template is required when notifications are enabled"
+                });
+            }
+
+
+            notificationTemplateValue =
+                String(
+                    notificationTemplate
+                ).trim();
         }
 
 
         // =================================================
-        // CREATE LOYALTY
+        // CREATE LOYALTY PROGRAM
         // =================================================
 
         const loyaltyProgram =
             await LoyaltyProgram.create({
 
-                vendorId,
+                // -----------------------------------------
+                // Vendor
+                // -----------------------------------------
+
+                vendorId:
+                    vendorId,
+
+
+                // -----------------------------------------
+                // Image
+                // -----------------------------------------
 
                 image:
                     imagePath,
+
+
+                // -----------------------------------------
+                // Program
+                // -----------------------------------------
 
                 programName:
                     programName.trim(),
@@ -305,7 +456,20 @@ async function createLoyaltyProgram(
                         : null,
 
 
-                // Notification
+                // =========================================
+                // NOTIFICATION
+                // =========================================
+                //
+                // When false:
+                //
+                // all these values are NULL.
+                //
+                // When true:
+                //
+                // validated values are stored.
+                //
+                // =========================================
+
                 notificationEnabled:
                     isNotificationEnabled,
 
@@ -313,44 +477,25 @@ async function createLoyaltyProgram(
                     notificationStarFieldValue,
 
                 notificationConditionOperator:
-                    isNotificationEnabled
-                        ? notificationConditionOperatorValue
-                        : null,
+                    notificationConditionOperatorValue,
 
                 notificationComparisonOperator:
-                    isNotificationEnabled
-                        ? notificationComparisonOperatorValue
-                        : null,
+                    notificationComparisonOperatorValue,
 
                 notificationComparisonValue:
-                    isNotificationEnabled
-                        ? notificationComparisonValueNumber
-                        : null,
+                    notificationComparisonValueNumber,
 
                 notificationAction:
-                    isNotificationEnabled
-                        ? (
-                            notificationAction
-                                ? String(
-                                    notificationAction
-                                ).trim()
-                                : null
-                        )
-                        : null,
+                    notificationActionValue,
 
                 notificationTemplate:
-                    isNotificationEnabled
-                        ? (
-                            notificationTemplate
-                                ? String(
-                                    notificationTemplate
-                                ).trim()
-                                : null
-                        )
-                        : null,
+                    notificationTemplateValue,
 
 
-                // Pin verification
+                // -----------------------------------------
+                // PIN VERIFICATION
+                // -----------------------------------------
+
                 enablePinVerification:
                     enablePinVerification === true ||
                     enablePinVerification === "true"
@@ -362,10 +507,12 @@ async function createLoyaltyProgram(
         // =================================================
 
         return res.status(201).json({
+
             message:
                 "Loyalty program created successfully",
 
             loyaltyProgram: {
+
                 id:
                     loyaltyProgram.id,
 
@@ -391,6 +538,7 @@ async function createLoyaltyProgram(
                     loyaltyProgram.programRules,
 
 
+                // Notification
                 notificationEnabled:
                     loyaltyProgram.notificationEnabled,
 
@@ -446,7 +594,6 @@ async function getRecentLoyaltyPrograms(
 ) {
     try {
 
-        // Vendor ID from JWT
         const vendorId =
             req.user.id;
 
@@ -455,7 +602,8 @@ async function getRecentLoyaltyPrograms(
             await LoyaltyProgram.findAll({
 
                 where: {
-                    vendorId
+                    vendorId:
+                        vendorId
                 },
 
                 order: [
@@ -470,6 +618,7 @@ async function getRecentLoyaltyPrograms(
 
 
         return res.status(200).json({
+
             message:
                 "Recent loyalty programs fetched successfully",
 
@@ -504,7 +653,6 @@ async function getAllLoyaltyPrograms(
 ) {
     try {
 
-        // Vendor ID from JWT
         const vendorId =
             req.user.id;
 
@@ -513,7 +661,8 @@ async function getAllLoyaltyPrograms(
             await LoyaltyProgram.findAll({
 
                 where: {
-                    vendorId
+                    vendorId:
+                        vendorId
                 },
 
                 order: [
@@ -526,6 +675,7 @@ async function getAllLoyaltyPrograms(
 
 
         return res.status(200).json({
+
             message:
                 "Loyalty programs fetched successfully",
 
