@@ -1,228 +1,113 @@
-const {
-    UserRole,
-    Role
-} = require("../models");
+const { UserRole, Role } = require('../models');
 
-
-// =====================================================
 // GENERIC ROLE AUTHORIZATION
-// =====================================================
-//
-// Checks the user_roles junction table.
-//
-// Only a role assignment with:
-//
-// suspended = false
-//
-// is considered active.
-//
-// =====================================================
 
-const authorizeRoles = (
-    ...allowedRoles
-) => {
-    return async (
-        req,
-        res,
-        next
-    ) => {
-        try {
+const authorizeRoles = (...allowedRoles) => {
+  return async (req, res, next) => {
+    try {
+      // AUTHENTICATION CHECK
 
-            // =============================================
-            // AUTHENTICATION CHECK
-            // =============================================
+      if (!req.user) {
+        return res.status(401).json({
+          message: 'Authentication required.',
+        });
+      }
 
-            if (!req.user) {
-                return res.status(401).json({
-                    message:
-                        "Authentication required."
-                });
-            }
+      // FIND ACTIVE ROLE ASSIGNMENT
 
+      const assignment = await UserRole.findOne({
+        where: {
+          userId: req.user.id,
 
-            // =============================================
-            // FIND ACTIVE ROLE ASSIGNMENT
-            // =============================================
+          suspended: false,
+        },
 
-            const assignment =
-                await UserRole.findOne({
-                    where: {
-                        userId:
-                            req.user.id,
+        include: [
+          {
+            model: Role,
 
-                        suspended:
-                            false
-                    },
+            as: 'role',
 
-                    include: [
-                        {
-                            model:
-                                Role,
+            where: {
+              name: allowedRoles,
+            },
 
-                            as:
-                                "role",
+            attributes: ['id', 'name'],
+          },
+        ],
+      });
 
-                            where: {
-                                name:
-                                    allowedRoles
-                            },
+      // NO ACTIVE ROLE
 
-                            attributes: [
-                                "id",
-                                "name"
-                            ]
-                        }
-                    ]
-                });
+      if (!assignment) {
+        // -----------------------------------------
+        // Check whether the user has the role
+        // but it is suspended.
+        // -----------------------------------------
 
+        const suspendedAssignment = await UserRole.findOne({
+          where: {
+            userId: req.user.id,
 
-            // =============================================
-            // NO ACTIVE ROLE
-            // =============================================
+            suspended: true,
+          },
 
-            if (!assignment) {
+          include: [
+            {
+              model: Role,
 
-                // -----------------------------------------
-                // Check whether the user has the role
-                // but it is suspended.
-                // -----------------------------------------
+              as: 'role',
 
-                const suspendedAssignment =
-                    await UserRole.findOne({
-                        where: {
-                            userId:
-                                req.user.id,
+              where: {
+                name: allowedRoles,
+              },
 
-                            suspended:
-                                true
-                        },
+              attributes: ['id', 'name'],
+            },
+          ],
+        });
 
-                        include: [
-                            {
-                                model:
-                                    Role,
-
-                                as:
-                                    "role",
-
-                                where: {
-                                    name:
-                                        allowedRoles
-                                },
-
-                                attributes: [
-                                    "id",
-                                    "name"
-                                ]
-                            }
-                        ]
-                    });
-
-
-                if (
-                    suspendedAssignment
-                ) {
-                    return res.status(403).json({
-                        message:
-                            "Your role is suspended."
-                    });
-                }
-
-
-                return res.status(403).json({
-                    message:
-                        "You do not have permission to access this resource."
-                });
-            }
-
-
-            // =============================================
-            // AUTHORIZED
-            // =============================================
-
-            req.authorizedRole =
-                assignment.role.name;
-
-
-            next();
-
-        } catch (error) {
-
-            console.error(
-                "Role authorization error:",
-                error
-            );
-
-            return res.status(500).json({
-                message:
-                    "Internal server error."
-            });
+        if (suspendedAssignment) {
+          return res.status(403).json({
+            message: 'Your role is suspended.',
+          });
         }
-    };
+
+        return res.status(403).json({
+          message: 'You do not have permission to access this resource.',
+        });
+      }
+
+      // AUTHORIZED
+
+      req.authorizedRole = assignment.role.name;
+
+      next();
+    } catch (error) {
+      console.error('Role authorization error:', error);
+
+      return res.status(500).json({
+        message: 'Internal server error.',
+      });
+    }
+  };
 };
 
-
-// =====================================================
 // USER
-// =====================================================
-//
-// Requires:
-//
-// role = user
-// suspended = false
-//
-// A vendor with BOTH:
-//
-// user    suspended=false
-// vendor  suspended=false
-//
-// can access /user routes.
-//
-// =====================================================
 
-const authorizeUser =
-    authorizeRoles(
-        "user"
-    );
+const authorizeUser = authorizeRoles('user');
 
-
-// =====================================================
 // VENDOR
-// =====================================================
-//
-// Requires:
-//
-// role = vendor
-// suspended = false
-//
-// =====================================================
 
-const authorizeVendor =
-    authorizeRoles(
-        "vendor"
-    );
+const authorizeVendor = authorizeRoles('vendor');
 
-
-// =====================================================
 // SUPERADMIN
-// =====================================================
-//
-// Requires:
-//
-// role = superadmin
-// suspended = false
-//
-// =====================================================
 
-const authorizeSuperadmin =
-    authorizeRoles(
-        "superadmin"
-    );
-
+const authorizeSuperadmin = authorizeRoles('superadmin');
 
 module.exports = {
-    authorizeRoles,
-    authorizeUser,
-    authorizeVendor,
-    authorizeSuperadmin
+  authorizeRoles,
+  authorizeUser,
+  authorizeVendor,
+  authorizeSuperadmin,
 };
