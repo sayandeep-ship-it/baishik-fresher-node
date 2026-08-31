@@ -2,84 +2,38 @@ const express = require('express');
 
 const router = express.Router();
 
-// CONTROLLERS
-
-const vendorController = require('../controller/vendorController');
-
-// MIDDLEWARE
-
+const adminController = require('../controller/adminController');
 const authenticate = require('../middleware/authMiddleware');
+const { authorizeSuperadmin } = require('../middleware/roleMiddleware');
 
-const { authorizeVendor } = require('../middleware/roleMiddleware');
+// SUPERADMIN LOGIN
+router.post('/login', adminController.login);
 
-const uploadLoyaltyImage = require('../middleware/loyaltyUploadMiddleware');
+// SUPERADMIN ME
+router.get('/me', authenticate, authorizeSuperadmin, adminController.getMe);
 
-// VENDOR LOGIN
-
-router.post('/login', vendorController.login);
-
-// VENDOR ME
-
-router.get('/me', authenticate, authorizeVendor, vendorController.getMe);
-
-// VENDOR PROFILE
-
-router.get('/profile', authenticate, authorizeVendor, vendorController.getProfile);
-
-// UPDATE VENDOR BASIC INFORMATION
-
-router.patch('/profile', authenticate, authorizeVendor, vendorController.updateProfile);
-
-// VENDOR ADDRESS
-
-router.post('/address', authenticate, authorizeVendor, vendorController.saveAddress);
-
-// GET VENDOR ADDRESS
-
-router.get('/address', authenticate, authorizeVendor, vendorController.getAddress);
-
-// VENDOR CHANGE PASSWORD
-
-router.patch('/change-password', authenticate, authorizeVendor, vendorController.changeVendorPassword);
-
-// VENDOR DASHBOARD
-
-router.get('/dashboard', authenticate, authorizeVendor, vendorController.getDashboard);
-
-// CREATE LOYALTY PROGRAM
-
+// PROMOTE USER TO VENDOR
 router.post(
-  '/loyalty-programs',
+  '/users/:userId/vendor',
   authenticate,
-  authorizeVendor,
-  uploadLoyaltyImage.single('image'),
-  vendorController.createLoyaltyProgram
+  authorizeSuperadmin,
+  adminController.appointVendor
 );
 
-// GET ALL OWN LOYALTY PROGRAMS
-
-router.get('/loyalty-programs', authenticate, authorizeVendor, vendorController.getAllLoyaltyPrograms);
-
-// GET RECENT OWN LOYALTY PROGRAMS
-
-router.get('/loyalty-programs/recent', authenticate, authorizeVendor, vendorController.getRecentLoyaltyPrograms);
-
-// ACTIVATE OWN LOYALTY PROGRAM
-
+// SUSPEND VENDOR
 router.patch(
-  '/loyalty-programs/:programId/activate',
+  '/users/:userId/vendor/suspend',
   authenticate,
-  authorizeVendor,
-  vendorController.activateLoyaltyProgram
+  authorizeSuperadmin,
+  adminController.suspendVendor
 );
 
-// DEACTIVATE OWN LOYALTY PROGRAM
-
+// ACTIVATE VENDOR
 router.patch(
-  '/loyalty-programs/:programId/deactivate',
+  '/users/:userId/vendor/activate',
   authenticate,
-  authorizeVendor,
-  vendorController.deactivateLoyaltyProgram
+  authorizeSuperadmin,
+  adminController.activateVendor
 );
 
 module.exports = router;

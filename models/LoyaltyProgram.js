@@ -151,7 +151,34 @@ const LoyaltyProgram = sequelize.define(
       field: 'is_active',
     },
     // =================================================
-    // PIN VERIFICATION
+    // QR CODE + PIN VERIFICATION
+    // =================================================
+
+    // New canonical flag.
+    hasPin: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'has_pin',
+    },
+
+    // Unique server-side value embedded in the QR payload.
+    qrCodeToken: {
+      type: DataTypes.STRING(128),
+      allowNull: false,
+      unique: true,
+      field: 'qr_code_token',
+    },
+
+    // Generated QR image as a data URL.
+    qrCodeImage: {
+      type: DataTypes.TEXT('long'),
+      allowNull: false,
+      field: 'qr_code_image',
+    },
+
+    // =================================================
+    // PIN VERIFICATION (backward-compatible alias)
     // =================================================
 
     enablePinVerification: {

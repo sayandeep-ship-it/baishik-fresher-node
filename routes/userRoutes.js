@@ -65,4 +65,24 @@ router.get(
 
 router.post('/loyalty-programs/:programId/enroll', authenticate, authorizeUser, userController.enrollLoyaltyProgram);
 
+// SCAN LOYALTY PROGRAM QR CODE
+// Uses the authenticated current user from the same JWT identity used by /me.
+// GET /me remains read-only.
+
+router.post(
+  '/me/loyalty-programs/scan',
+  authenticate,
+  authorizeUser,
+  userController.scanLoyaltyQr
+);
+
+// VERIFY VENDOR-GENERATED PIN AFTER A PIN-PROTECTED QR SCAN
+
+router.post(
+  '/me/loyalty-programs/verify-pin',
+  authenticate,
+  authorizeUser,
+  userController.verifyLoyaltyPin
+);
+
 module.exports = router;

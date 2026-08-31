@@ -1,7 +1,19 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const QRCode = require('qrcode');
 const { Op } = require('sequelize');
-const { User, Role, UserRole, VendorDetails, LoyaltyProgram, UserVendorEnrollment } = require('../models');
+const {
+  sequelize,
+  User,
+  Role,
+  UserRole,
+  VendorDetails,
+  LoyaltyProgram,
+  UserVendorEnrollment,
+  LoyaltyProgramPin,
+  LoyaltyScan,
+} = require('../models');
 // HELPERS
 const normalizeEmail = (email) => {
   return email.trim().toLowerCase();
@@ -484,7 +496,9 @@ exports.getDashboard = async (req, res) => {
   }
 };
 
+// =====================================================
 // VENDOR LOYALTY PROGRAMS
+// =====================================================
 
 const getPaginationParams = (req, defaultLimit = 10, maxLimit = 100) => {
   let page = Number(req.query.page);
@@ -556,7 +570,9 @@ const validateNotificationSettings = (body) => {
   ];
 
   if (!notificationConditionOperator) {
-    return { error: 'Notification condition operator is required when notifications are enabled.' };
+    return {
+      error: 'Notification condition operator is required when notifications are enabled.',
+    };
   }
 
   values.notificationConditionOperator = String(notificationConditionOperator).toUpperCase();
@@ -566,7 +582,9 @@ const validateNotificationSettings = (body) => {
   }
 
   if (!notificationComparisonOperator) {
-    return { error: 'Notification comparison operator is required when notifications are enabled.' };
+    return {
+      error: 'Notification comparison operator is required when notifications are enabled.',
+    };
   }
 
   values.notificationComparisonOperator = String(notificationComparisonOperator).toUpperCase();
@@ -580,23 +598,31 @@ const validateNotificationSettings = (body) => {
     notificationComparisonValue === null ||
     notificationComparisonValue === ''
   ) {
-    return { error: 'Notification comparison value is required when notifications are enabled.' };
+    return {
+      error: 'Notification comparison value is required when notifications are enabled.',
+    };
   }
 
   const comparisonValue = Number(notificationComparisonValue);
 
   if (!Number.isInteger(comparisonValue) || comparisonValue < 0) {
-    return { error: 'Notification comparison value must be a non-negative integer.' };
+    return {
+      error: 'Notification comparison value must be a non-negative integer.',
+    };
   }
 
   values.notificationComparisonValue = comparisonValue;
 
   if (!notificationAction) {
-    return { error: 'Notification action is required when notifications are enabled.' };
+    return {
+      error: 'Notification action is required when notifications are enabled.',
+    };
   }
 
   if (!notificationTemplate) {
-    return { error: 'Notification template is required when notifications are enabled.' };
+    return {
+      error: 'Notification template is required when notifications are enabled.',
+    };
   }
 
   values.notificationAction = String(notificationAction).trim();
@@ -639,11 +665,15 @@ exports.createLoyaltyProgram = async (req, res) => {
     const intervalValue = Number(qrCodeScanIntervalValue);
 
     if (!Number.isInteger(starCollection) || starCollection <= 0) {
-      return res.status(400).json({ message: 'Required star collection must be a positive integer' });
+      return res.status(400).json({
+        message: 'Required star collection must be a positive integer',
+      });
     }
 
     if (!Number.isInteger(intervalValue) || intervalValue <= 0) {
-      return res.status(400).json({ message: 'QR code scan interval value must be a positive integer' });
+      return res.status(400).json({
+        message: 'QR code scan interval value must be a positive integer',
+      });
     }
 
     const intervalUnit = String(qrCodeScanIntervalUnit).toUpperCase();
@@ -667,6 +697,28 @@ exports.createLoyaltyProgram = async (req, res) => {
 
     const n = notificationResult.values;
 
+    // `hasPin` is the new field. Keep `enablePinVerification` as a
+    // backward-compatible input/output alias for existing clients.
+    let hasPin;
+    if (req.body.hasPin !== undefined) {
+      hasPin = req.body.hasPin === true || req.body.hasPin === 'true';
+    } else {
+      hasPin = enablePinVerification === true || enablePinVerification === 'true';
+    }
+
+    // Generate one unique QR token per loyalty program.
+    const qrCodeToken = crypto.randomBytes(32).toString('hex');
+    const qrPayload = JSON.stringify({
+      type: 'LOYALTY_PROGRAM',
+      token: qrCodeToken,
+    });
+
+    const qrCodeImage = await QRCode.toDataURL(qrPayload, {
+      errorCorrectionLevel: 'M',
+      width: 320,
+      margin: 2,
+    });
+
     const loyaltyProgram = await LoyaltyProgram.create({
       vendorId,
       image: imagePath,
@@ -682,7 +734,10 @@ exports.createLoyaltyProgram = async (req, res) => {
       notificationComparisonValue: n.notificationComparisonValue,
       notificationAction: n.notificationAction,
       notificationTemplate: n.notificationTemplate,
-      enablePinVerification: enablePinVerification === true || enablePinVerification === 'true',
+      enablePinVerification: hasPin,
+      hasPin,
+      qrCodeToken,
+      qrCodeImage,
       isActive: true,
     });
 
@@ -828,7 +883,92 @@ exports.deactivateLoyaltyProgram = async (req, res) => {
   }
 };
 
+// =====================================================
+// GENERATE ONE-TIME LOYALTY PIN
+// =====================================================
+
+exports.generateLoyaltyPin = async (req, res) => {
+  try {
+    const programId = Number(req.params.programId);
+
+    if (!Number.isInteger(programId) || programId <= 0) {
+      return res.status(400).json({
+        message: 'A valid loyalty program id is required.',
+      });
+    }
+
+    const program = await LoyaltyProgram.findOne({
+      where: {
+        id: programId,
+        vendorId: req.user.id,
+      },
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        message: 'Loyalty program not found.',
+      });
+    }
+
+    if (!program.isActive) {
+      return res.status(400).json({
+        message: 'Cannot generate a PIN for an inactive loyalty program.',
+      });
+    }
+
+    if (!program.hasPin && !program.enablePinVerification) {
+      return res.status(400).json({
+        message: 'PIN verification is not enabled for this loyalty program.',
+      });
+    }
+
+    const pin = crypto.randomInt(100000, 1000000).toString();
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    const expiryMinutes = Number(process.env.LOYALTY_PIN_EXPIRY_MINUTES || 5);
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    // Revoke every previous unused PIN for this program.
+    await LoyaltyProgramPin.update(
+      {
+        revokedAt: new Date(),
+      },
+      {
+        where: {
+          loyaltyProgramId: program.id,
+          usedAt: null,
+          revokedAt: null,
+        },
+      }
+    );
+
+    await LoyaltyProgramPin.create({
+      loyaltyProgramId: program.id,
+      vendorId: req.user.id,
+      pinHash,
+      expiresAt,
+      usedAt: null,
+      revokedAt: null,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Loyalty verification PIN generated successfully.',
+      loyaltyProgramId: program.id,
+      pin,
+      expiresAt,
+    });
+  } catch (error) {
+    console.error('Generate loyalty PIN error:', error);
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+
+// =====================================================
 // VENDOR PROFILE / ME
+// =====================================================
 
 exports.getMe = async (req, res) => {
   try {
@@ -869,8 +1009,8 @@ exports.getMe = async (req, res) => {
     });
   }
 };
-// GET VENDOR PROFILE
 
+// GET VENDOR PROFILE
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
@@ -881,23 +1021,40 @@ exports.getProfile = async (req, res) => {
       });
     }
 
+    const vendorDetails = await VendorDetails.findOne({
+      where: {
+        userId: req.user.id,
+      },
+    });
+
     return res.status(200).json({
       success: true,
 
       message: 'Vendor profile fetched successfully.',
 
+      token: req.token || null,
+
       vendor: {
         id: user.id,
-
         firstName: user.firstName,
-
         lastName: user.lastName,
-
         email: user.email,
-
         isActive: user.isActive,
-
         roles: req.user.roles,
+
+        vendorDetails: vendorDetails
+          ? {
+              hasAddress: vendorDetails.hasAddress,
+              streetAddress: vendorDetails.streetAddress,
+              city: vendorDetails.city,
+              country: vendorDetails.country,
+              state: vendorDetails.state,
+              pinCode: vendorDetails.pinCode,
+              storeName: vendorDetails.storeName,
+              storeType: vendorDetails.storeType,
+              image: vendorDetails.image,
+            }
+          : null,
       },
     });
   } catch (error) {
@@ -909,7 +1066,10 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// =====================================================
 // UPDATE VENDOR BASIC INFORMATION
+// =====================================================
+
 exports.updateProfile = async (req, res) => {
   try {
     const { firstName, lastName } = req.body || {};

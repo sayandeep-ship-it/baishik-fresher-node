@@ -6,6 +6,9 @@ const UserRole = require('./UserRole');
 const VendorDetails = require('./VendorDetails');
 const LoyaltyProgram = require('./LoyaltyProgram');
 const UserVendorEnrollment = require('./UserVendorEnrollment');
+const UserLoyaltyEnrollment = require('./UserLoyaltyEnrollment');
+const LoyaltyProgramPin = require('./LoyaltyProgramPin');
+const LoyaltyScan = require('./LoyaltyScan');
 
 // USER <-> ROLE
 
@@ -104,6 +107,84 @@ UserVendorEnrollment.belongsTo(User, {
   as: 'vendor',
 });
 
+// =====================================================
+// USER <-> LOYALTY ENROLLMENT
+// =====================================================
+
+User.hasMany(UserLoyaltyEnrollment, {
+  foreignKey: 'userId',
+  as: 'loyaltyEnrollments',
+  onDelete: 'CASCADE',
+});
+
+UserLoyaltyEnrollment.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+LoyaltyProgram.hasMany(UserLoyaltyEnrollment, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'enrollments',
+  onDelete: 'CASCADE',
+});
+
+UserLoyaltyEnrollment.belongsTo(LoyaltyProgram, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'loyaltyProgram',
+});
+
+// =====================================================
+// LOYALTY PROGRAM <-> PIN
+// =====================================================
+
+LoyaltyProgram.hasMany(LoyaltyProgramPin, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'pins',
+  onDelete: 'CASCADE',
+});
+
+LoyaltyProgramPin.belongsTo(LoyaltyProgram, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'loyaltyProgram',
+});
+
+User.hasMany(LoyaltyProgramPin, {
+  foreignKey: 'vendorId',
+  as: 'generatedLoyaltyPins',
+  onDelete: 'RESTRICT',
+});
+
+LoyaltyProgramPin.belongsTo(User, {
+  foreignKey: 'vendorId',
+  as: 'vendor',
+});
+
+// =====================================================
+// USER <-> LOYALTY SCANS
+// =====================================================
+
+User.hasMany(LoyaltyScan, {
+  foreignKey: 'userId',
+  as: 'loyaltyScans',
+  onDelete: 'CASCADE',
+});
+
+LoyaltyScan.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+LoyaltyProgram.hasMany(LoyaltyScan, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'scans',
+  onDelete: 'CASCADE',
+});
+
+LoyaltyScan.belongsTo(LoyaltyProgram, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'loyaltyProgram',
+});
+
 module.exports = {
   sequelize,
   User,
@@ -112,4 +193,7 @@ module.exports = {
   VendorDetails,
   LoyaltyProgram,
   UserVendorEnrollment,
+  UserLoyaltyEnrollment,
+  LoyaltyProgramPin,
+  LoyaltyScan,
 };

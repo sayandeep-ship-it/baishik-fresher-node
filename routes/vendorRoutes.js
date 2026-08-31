@@ -73,6 +73,15 @@ router.patch(
   vendorController.activateLoyaltyProgram
 );
 
+// GENERATE PIN FOR A PIN-PROTECTED LOYALTY PROGRAM
+
+router.post(
+  '/loyalty-programs/:programId/pin',
+  authenticate,
+  authorizeVendor,
+  vendorController.generateLoyaltyPin
+);
+
 // DEACTIVATE OWN LOYALTY PROGRAM
 
 router.patch(

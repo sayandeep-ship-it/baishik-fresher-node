@@ -13,9 +13,7 @@ const getActiveRoleNames = async (userId) => {
   return assignments.map((assignment) => assignment.role.name);
 };
 
-// =====================================================
 // SUPERADMIN LOGIN
-// =====================================================
 
 exports.login = async (req, res) => {
   try {
@@ -86,9 +84,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// =====================================================
 // SUPERADMIN ME
-// =====================================================
 
 exports.getMe = async (req, res) => {
   try {
@@ -115,9 +111,7 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// =====================================================
 // APPOINT USER AS VENDOR
-// =====================================================
 
 exports.appointVendor = async (req, res) => {
   try {
@@ -170,9 +164,7 @@ exports.appointVendor = async (req, res) => {
   }
 };
 
-// =====================================================
 // SUSPEND VENDOR
-// =====================================================
 
 exports.suspendVendor = async (req, res) => {
   try {
@@ -208,9 +200,7 @@ exports.suspendVendor = async (req, res) => {
   }
 };
 
-// =====================================================
 // ACTIVATE VENDOR
-// =====================================================
 
 exports.activateVendor = async (req, res) => {
   try {
