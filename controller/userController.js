@@ -1,7 +1,15 @@
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 
-const { User, Role, UserRole, VendorDetails, LoyaltyProgram, UserVendorEnrollment } = require('../models');
+const {
+  User,
+  Role,
+  UserRole,
+  VendorDetails,
+  LoyaltyProgram,
+  UserVendorEnrollment,
+  UserLoyaltyEnrollment,
+} = require('../models');
 
 // HELPERS
 
@@ -157,6 +165,110 @@ const getEnrollmentForUser = async (userId, vendorId) => {
   });
 };
 
+// USER LOGIN
+
+const jwt = require('jsonwebtoken');
+
+const getActiveRoleNames = async (userId) => {
+  const assignments = await UserRole.findAll({
+    where: { userId, suspended: false },
+    include: [{ model: Role, as: 'role', attributes: ['name'] }],
+  });
+  return assignments.map((assignment) => assignment.role.name);
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Email and password are required.',
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const user = await User.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: 'Invalid email or password.',
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: 'Please verify your email before logging in.',
+      });
+    }
+
+    const userRole = await Role.findOne({
+      where: { name: 'user' },
+    });
+
+    if (!userRole) {
+      return res.status(500).json({
+        message: 'User role is not configured.',
+      });
+    }
+
+    const userAssignment = await UserRole.findOne({
+      where: {
+        userId: user.id,
+        roleId: userRole.id,
+        suspended: false,
+      },
+    });
+
+    if (!userAssignment) {
+      return res.status(403).json({
+        message: 'Active user role is required.',
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        message: 'Invalid email or password.',
+      });
+    }
+
+    const roles = await getActiveRoleNames(user.id);
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        roles,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+      }
+    );
+
+    return res.status(200).json({
+      message: 'Login successful.',
+      token,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        roles,
+      },
+    });
+  } catch (error) {
+    console.error('User login error:', error);
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+
 // GET STORE LISTING
 
 exports.getStores = async (req, res) => {
@@ -278,6 +390,7 @@ exports.getStoreById = async (req, res) => {
     const loyaltyPrograms = await LoyaltyProgram.findAll({
       where: {
         vendorId: vendor.id,
+        isActive: true,
       },
 
       order: [['createdAt', 'DESC']],
@@ -326,8 +439,8 @@ exports.getLoyaltyProgramDetails = async (req, res) => {
     const program = await LoyaltyProgram.findOne({
       where: {
         id: programId,
-
         vendorId: vendorId,
+        isActive: true,
       },
     });
 
@@ -361,6 +474,74 @@ exports.getLoyaltyProgramDetails = async (req, res) => {
   } catch (error) {
     console.error('Get loyalty program details error:', error);
 
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+
+// ENROLL IN LOYALTY PROGRAM
+
+exports.enrollLoyaltyProgram = async (req, res) => {
+  try {
+    const programId = Number(req.params.programId);
+
+    if (!Number.isInteger(programId) || programId <= 0) {
+      return res.status(400).json({
+        message: 'A valid loyalty program id is required.',
+      });
+    }
+
+    const program = await LoyaltyProgram.findOne({
+      where: {
+        id: programId,
+        isActive: true,
+      },
+    });
+
+    if (!program) {
+      return res.status(404).json({
+        message: 'Active loyalty program not found.',
+      });
+    }
+
+    const vendorResult = await findActiveVendor(program.vendorId);
+
+    if (vendorResult.errorStatus) {
+      return res.status(vendorResult.errorStatus).json({
+        message: vendorResult.errorMessage,
+      });
+    }
+
+    const existingEnrollment = await UserLoyaltyEnrollment.findOne({
+      where: {
+        userId: req.user.id,
+        loyaltyProgramId: program.id,
+      },
+    });
+
+    if (existingEnrollment) {
+      return res.status(409).json({
+        message: 'You are already enrolled in this loyalty program.',
+        enrollment: existingEnrollment,
+      });
+    }
+
+    const enrollment = await UserLoyaltyEnrollment.create({
+      userId: req.user.id,
+      loyaltyProgramId: program.id,
+      starsCollected: 0,
+      pendingStars: 0,
+      redeemedStars: 0,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Loyalty program enrollment successful.',
+      enrollment,
+    });
+  } catch (error) {
+    console.error('Enroll loyalty program error:', error);
     return res.status(500).json({
       message: 'Internal server error.',
     });
@@ -531,6 +712,40 @@ exports.changePassword = async (req, res) => {
   } catch (error) {
     console.error('User change password error:', error);
 
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+
+// USER ME
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'User details fetched successfully.',
+      token: req.token || null,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        isActive: user.isActive,
+        roles: req.user.roles,
+        roleAssignments: req.user.roleAssignments,
+      },
+    });
+  } catch (error) {
+    console.error('Get user details error:', error);
     return res.status(500).json({
       message: 'Internal server error.',
     });

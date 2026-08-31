@@ -483,3 +483,473 @@ exports.getDashboard = async (req, res) => {
     });
   }
 };
+
+// VENDOR LOYALTY PROGRAMS
+
+const getPaginationParams = (req, defaultLimit = 10, maxLimit = 100) => {
+  let page = Number(req.query.page);
+  let limit = Number(req.query.limit);
+
+  if (!Number.isInteger(page) || page < 1) page = 1;
+  if (!Number.isInteger(limit) || limit < 1) limit = defaultLimit;
+  if (limit > maxLimit) limit = maxLimit;
+
+  return {
+    page,
+    limit,
+    offset: (page - 1) * limit,
+  };
+};
+
+const buildProgramSearchCondition = (search) => {
+  const value = search ? String(search).trim() : '';
+
+  if (!value) return {};
+
+  return {
+    [Op.or]: [{ programName: { [Op.like]: `%${value}%` } }, { programRules: { [Op.like]: `%${value}%` } }],
+  };
+};
+
+const validateNotificationSettings = (body) => {
+  const {
+    notificationEnabled,
+    notificationStarField,
+    notificationConditionOperator,
+    notificationComparisonOperator,
+    notificationComparisonValue,
+    notificationAction,
+    notificationTemplate,
+  } = body || {};
+
+  const enabled = notificationEnabled === true || notificationEnabled === 'true';
+
+  let values = {
+    notificationEnabled: enabled,
+    notificationStarField: null,
+    notificationConditionOperator: null,
+    notificationComparisonOperator: null,
+    notificationComparisonValue: null,
+    notificationAction: null,
+    notificationTemplate: null,
+  };
+
+  if (!enabled) return { values };
+
+  values.notificationStarField = notificationStarField ? String(notificationStarField).trim() : 'STAR_COUNT';
+
+  const allowedConditionOperators = [
+    'LESS_THAN',
+    'GREATER_THAN',
+    'EQUAL_TO',
+    'LESS_THAN_OR_EQUAL',
+    'GREATER_THAN_OR_EQUAL',
+  ];
+
+  const allowedComparisonOperators = [
+    'EQUAL_TO',
+    'NOT_EQUAL_TO',
+    'LESS_THAN',
+    'GREATER_THAN',
+    'LESS_THAN_OR_EQUAL',
+    'GREATER_THAN_OR_EQUAL',
+  ];
+
+  if (!notificationConditionOperator) {
+    return { error: 'Notification condition operator is required when notifications are enabled.' };
+  }
+
+  values.notificationConditionOperator = String(notificationConditionOperator).toUpperCase();
+
+  if (!allowedConditionOperators.includes(values.notificationConditionOperator)) {
+    return { error: 'Invalid notification condition operator.' };
+  }
+
+  if (!notificationComparisonOperator) {
+    return { error: 'Notification comparison operator is required when notifications are enabled.' };
+  }
+
+  values.notificationComparisonOperator = String(notificationComparisonOperator).toUpperCase();
+
+  if (!allowedComparisonOperators.includes(values.notificationComparisonOperator)) {
+    return { error: 'Invalid notification comparison operator.' };
+  }
+
+  if (
+    notificationComparisonValue === undefined ||
+    notificationComparisonValue === null ||
+    notificationComparisonValue === ''
+  ) {
+    return { error: 'Notification comparison value is required when notifications are enabled.' };
+  }
+
+  const comparisonValue = Number(notificationComparisonValue);
+
+  if (!Number.isInteger(comparisonValue) || comparisonValue < 0) {
+    return { error: 'Notification comparison value must be a non-negative integer.' };
+  }
+
+  values.notificationComparisonValue = comparisonValue;
+
+  if (!notificationAction) {
+    return { error: 'Notification action is required when notifications are enabled.' };
+  }
+
+  if (!notificationTemplate) {
+    return { error: 'Notification template is required when notifications are enabled.' };
+  }
+
+  values.notificationAction = String(notificationAction).trim();
+  values.notificationTemplate = String(notificationTemplate).trim();
+
+  return { values };
+};
+
+// CREATE LOYALTY PROGRAM
+exports.createLoyaltyProgram = async (req, res) => {
+  try {
+    const {
+      programName,
+      requiredStarCollection,
+      qrCodeScanIntervalValue,
+      qrCodeScanIntervalUnit,
+      programRules,
+      enablePinVerification,
+    } = req.body || {};
+
+    const vendorId = req.user.id;
+
+    if (!programName) {
+      return res.status(400).json({ message: 'Program name is required' });
+    }
+
+    if (requiredStarCollection === undefined || requiredStarCollection === null || requiredStarCollection === '') {
+      return res.status(400).json({ message: 'Required star collection is required' });
+    }
+
+    if (qrCodeScanIntervalValue === undefined || qrCodeScanIntervalValue === null || qrCodeScanIntervalValue === '') {
+      return res.status(400).json({ message: 'QR code scan interval value is required' });
+    }
+
+    if (!qrCodeScanIntervalUnit) {
+      return res.status(400).json({ message: 'QR code scan interval unit is required' });
+    }
+
+    const starCollection = Number(requiredStarCollection);
+    const intervalValue = Number(qrCodeScanIntervalValue);
+
+    if (!Number.isInteger(starCollection) || starCollection <= 0) {
+      return res.status(400).json({ message: 'Required star collection must be a positive integer' });
+    }
+
+    if (!Number.isInteger(intervalValue) || intervalValue <= 0) {
+      return res.status(400).json({ message: 'QR code scan interval value must be a positive integer' });
+    }
+
+    const intervalUnit = String(qrCodeScanIntervalUnit).toUpperCase();
+    const allowedUnits = ['MINUTES', 'HOURS', 'DAYS'];
+
+    if (!allowedUnits.includes(intervalUnit)) {
+      return res.status(400).json({
+        message: 'QR code scan interval unit must be MINUTES, HOURS or DAYS',
+      });
+    }
+
+    let imagePath = null;
+    if (req.file) {
+      imagePath = `/uploads/loyalty/${req.file.filename}`;
+    }
+
+    const notificationResult = validateNotificationSettings(req.body);
+    if (notificationResult.error) {
+      return res.status(400).json({ message: notificationResult.error });
+    }
+
+    const n = notificationResult.values;
+
+    const loyaltyProgram = await LoyaltyProgram.create({
+      vendorId,
+      image: imagePath,
+      programName: String(programName).trim(),
+      requiredStarCollection: starCollection,
+      qrCodeScanIntervalValue: intervalValue,
+      qrCodeScanIntervalUnit: intervalUnit,
+      programRules: programRules ? String(programRules).trim() : null,
+      notificationEnabled: n.notificationEnabled,
+      notificationStarField: n.notificationStarField,
+      notificationConditionOperator: n.notificationConditionOperator,
+      notificationComparisonOperator: n.notificationComparisonOperator,
+      notificationComparisonValue: n.notificationComparisonValue,
+      notificationAction: n.notificationAction,
+      notificationTemplate: n.notificationTemplate,
+      enablePinVerification: enablePinVerification === true || enablePinVerification === 'true',
+      isActive: true,
+    });
+
+    return res.status(201).json({
+      message: 'Loyalty program created successfully',
+      loyaltyProgram,
+    });
+  } catch (error) {
+    console.error('Create loyalty program error:', error);
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+};
+
+// GET RECENT LOYALTY PROGRAMS
+exports.getRecentLoyaltyPrograms = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { page, limit, offset } = getPaginationParams(req, 5, 50);
+    const search = req.query.search || '';
+    const searchCondition = buildProgramSearchCondition(search);
+
+    const result = await LoyaltyProgram.findAndCountAll({
+      where: { vendorId, ...searchCondition },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    const totalPages = Math.ceil(result.count / limit);
+
+    return res.status(200).json({
+      message: 'Recent loyalty programs fetched successfully',
+      search: String(search).trim(),
+      pagination: {
+        page,
+        limit,
+        total: result.count,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+      count: result.rows.length,
+      loyaltyPrograms: result.rows,
+    });
+  } catch (error) {
+    console.error('Get recent loyalty programs error:', error);
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+};
+
+// GET ALL LOYALTY PROGRAMS
+exports.getAllLoyaltyPrograms = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { page, limit, offset } = getPaginationParams(req, 10, 100);
+    const search = req.query.search || '';
+    const searchCondition = buildProgramSearchCondition(search);
+
+    const result = await LoyaltyProgram.findAndCountAll({
+      where: { vendorId, ...searchCondition },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    const totalPages = Math.ceil(result.count / limit);
+
+    return res.status(200).json({
+      message: 'Loyalty programs fetched successfully',
+      search: String(search).trim(),
+      pagination: {
+        page,
+        limit,
+        total: result.count,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+      count: result.rows.length,
+      loyaltyPrograms: result.rows,
+    });
+  } catch (error) {
+    console.error('Get all loyalty programs error:', error);
+    return res.status(500).json({ message: 'Something went wrong' });
+  }
+};
+
+// ACTIVATE OWN LOYALTY PROGRAM
+exports.activateLoyaltyProgram = async (req, res) => {
+  try {
+    const programId = Number(req.params.programId);
+    if (!Number.isInteger(programId) || programId <= 0) {
+      return res.status(400).json({ message: 'A valid loyalty program id is required.' });
+    }
+
+    const program = await LoyaltyProgram.findOne({
+      where: { id: programId, vendorId: req.user.id },
+    });
+
+    if (!program) return res.status(404).json({ message: 'Loyalty program not found.' });
+
+    if (program.isActive) return res.status(400).json({ message: 'Loyalty program is already active.' });
+
+    program.isActive = true;
+    await program.save();
+
+    return res.status(200).json({
+      message: 'Loyalty program activated successfully.',
+      loyaltyProgram: program,
+    });
+  } catch (error) {
+    console.error('Activate loyalty program error:', error);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// DEACTIVATE OWN LOYALTY PROGRAM
+exports.deactivateLoyaltyProgram = async (req, res) => {
+  try {
+    const programId = Number(req.params.programId);
+    if (!Number.isInteger(programId) || programId <= 0) {
+      return res.status(400).json({ message: 'A valid loyalty program id is required.' });
+    }
+
+    const program = await LoyaltyProgram.findOne({
+      where: { id: programId, vendorId: req.user.id },
+    });
+
+    if (!program) return res.status(404).json({ message: 'Loyalty program not found.' });
+
+    if (!program.isActive) return res.status(400).json({ message: 'Loyalty program is already inactive.' });
+
+    program.isActive = false;
+    await program.save();
+
+    return res.status(200).json({
+      message: 'Loyalty program deactivated successfully.',
+      loyaltyProgram: program,
+    });
+  } catch (error) {
+    console.error('Deactivate loyalty program error:', error);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+// VENDOR PROFILE / ME
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'Vendor not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      message: 'Vendor details fetched successfully.',
+
+      token: req.token || null,
+
+      vendor: {
+        id: user.id,
+
+        firstName: user.firstName,
+
+        lastName: user.lastName,
+
+        email: user.email,
+
+        isActive: user.isActive,
+
+        roles: req.user.roles,
+      },
+    });
+  } catch (error) {
+    console.error('Get vendor details error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+// GET VENDOR PROFILE
+
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'Vendor not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      message: 'Vendor profile fetched successfully.',
+
+      vendor: {
+        id: user.id,
+
+        firstName: user.firstName,
+
+        lastName: user.lastName,
+
+        email: user.email,
+
+        isActive: user.isActive,
+
+        roles: req.user.roles,
+      },
+    });
+  } catch (error) {
+    console.error('Get vendor profile error:', error);
+
+    return res.status(500).json({
+      message: 'Internal server error.',
+    });
+  }
+};
+
+// UPDATE VENDOR BASIC INFORMATION
+exports.updateProfile = async (req, res) => {
+  try {
+    const { firstName, lastName } = req.body || {};
+
+    if (firstName === undefined && lastName === undefined) {
+      return res.status(400).json({
+        message: 'At least one of firstName or lastName is required.',
+      });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: 'Vendor not found.' });
+
+    if (firstName !== undefined) {
+      const value = String(firstName).trim();
+      if (!value) return res.status(400).json({ message: 'First name cannot be empty.' });
+      user.firstName = value;
+    }
+
+    if (lastName !== undefined) {
+      const value = String(lastName).trim();
+      if (!value) return res.status(400).json({ message: 'Last name cannot be empty.' });
+      user.lastName = value;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor profile updated successfully.',
+      vendor: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        roles: req.user.roles,
+      },
+    });
+  } catch (error) {
+    console.error('Update vendor profile error:', error);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+};

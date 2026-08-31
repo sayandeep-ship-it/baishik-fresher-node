@@ -4,9 +4,7 @@ const bcrypt = require('bcryptjs');
 
 module.exports = {
   async up(queryInterface) {
-    // =================================================
     // ENVIRONMENT VALUES
-    // =================================================
 
     const email = process.env.SUPERADMIN_EMAIL;
 
@@ -22,9 +20,7 @@ module.exports = {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // =================================================
     // FIND SUPERADMIN ROLE
-    // =================================================
 
     const [roles] = await queryInterface.sequelize.query(
       `
@@ -41,9 +37,7 @@ module.exports = {
 
     const superadminRoleId = roles[0].id;
 
-    // =================================================
     // CHECK WHETHER USER ALREADY EXISTS
-    // =================================================
 
     const [existingUsers] = await queryInterface.sequelize.query(
       `
@@ -61,9 +55,7 @@ module.exports = {
 
     let userId;
 
-    // =================================================
     // CREATE SUPERADMIN USER IF IT DOES NOT EXIST
-    // =================================================
 
     if (!existingUsers.length) {
       const hashedPassword = await bcrypt.hash(password, 12);
@@ -92,9 +84,7 @@ module.exports = {
         },
       ]);
 
-      // =================================================
       // GET CREATED USER ID
-      // =================================================
 
       const [createdUsers] = await queryInterface.sequelize.query(
         `
@@ -119,9 +109,7 @@ module.exports = {
       userId = existingUsers[0].id;
     }
 
-    // =================================================
     // CHECK SUPERADMIN ROLE ASSIGNMENT
-    // =================================================
 
     const [existingAssignments] = await queryInterface.sequelize.query(
       `
@@ -140,9 +128,7 @@ module.exports = {
       }
     );
 
-    // =================================================
     // ASSIGN SUPERADMIN ROLE
-    // =================================================
 
     if (!existingAssignments.length) {
       const now = new Date();
@@ -167,9 +153,7 @@ module.exports = {
     }
   },
 
-  // =====================================================
   // DOWN
-  // =====================================================
 
   async down(queryInterface) {
     const email = process.env.SUPERADMIN_EMAIL;

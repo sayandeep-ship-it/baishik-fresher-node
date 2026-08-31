@@ -40,11 +40,7 @@ const authorizeRoles = (...allowedRoles) => {
       // NO ACTIVE ROLE
 
       if (!assignment) {
-        // -----------------------------------------
-        // Check whether the user has the role
-        // but it is suspended.
-        // -----------------------------------------
-
+        // CHECK FOR SUSPENDED ROLE
         const suspendedAssignment = await UserRole.findOne({
           where: {
             userId: req.user.id,
