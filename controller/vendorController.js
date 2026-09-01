@@ -708,8 +708,12 @@ exports.createLoyaltyProgram = async (req, res) => {
 
     // Generate one unique QR token per loyalty program.
     const qrCodeToken = crypto.randomBytes(32).toString('hex');
-    const qrUrl = `http://127.0.0.1:3000/{qrCodeToken}`;
-    const qrCodeImage = await QRCode.toDataURL(qrUrl, {
+    const qrPayload = JSON.stringify({
+      type: 'LOYALTY_PROGRAM',
+      token: qrCodeToken,
+      hasPin,
+    });
+    const qrCodeImage = await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'M',
       width: 320,
       margin: 2,
@@ -918,7 +922,7 @@ exports.generateLoyaltyPin = async (req, res) => {
       });
     }
 
-    const pin = crypto.randomInt(100000, 1000000).toString();
+    const pin = crypto.randomInt(100, 1000).toString();
     const pinHash = await bcrypt.hash(pin, 10);
 
     const expiryMinutes = Number(process.env.LOYALTY_PIN_EXPIRY_MINUTES || 5);

@@ -49,6 +49,7 @@ const LoyaltyProgramPin = sequelize.define(
   {
     tableName: 'loyalty_program_pins',
     timestamps: true,
+    underscored: true,
     indexes: [
       {
         fields: ['loyalty_program_id'],

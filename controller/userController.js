@@ -780,6 +780,18 @@ const parseQrCodePayload = (qrCode) => {
     return value.substring('LOYALTY_PROGRAM:'.length).trim();
   }
 
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    try {
+      const url = new URL(value);
+      const segments = url.pathname.split('/').filter(Boolean);
+      if (segments.length) {
+        return segments[segments.length - 1].trim();
+      }
+    } catch (error) {
+      // Not a valid URL; continue with raw token fallback.
+    }
+  }
+
   return value;
 };
 
@@ -1031,9 +1043,9 @@ exports.verifyLoyaltyPin = async (req, res) => {
       });
     }
 
-    if (!pin || !/^\d{6}$/.test(String(pin))) {
+    if (!pin || !/^\d{3}$/.test(String(pin))) {
       return res.status(400).json({
-        message: 'A valid 6-digit PIN is required.',
+        message: 'A valid 3-digit PIN is required.',
       });
     }
 

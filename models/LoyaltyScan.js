@@ -57,6 +57,7 @@ const LoyaltyScan = sequelize.define(
   {
     tableName: 'loyalty_scans',
     timestamps: true,
+    underscored: true,
     indexes: [
       {
         fields: ['user_id', 'loyalty_program_id', 'scanned_at'],
