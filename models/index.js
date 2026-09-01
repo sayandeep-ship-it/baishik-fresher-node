@@ -107,9 +107,7 @@ UserVendorEnrollment.belongsTo(User, {
   as: 'vendor',
 });
 
-// =====================================================
 // USER <-> LOYALTY ENROLLMENT
-// =====================================================
 
 User.hasMany(UserLoyaltyEnrollment, {
   foreignKey: 'userId',
@@ -133,9 +131,7 @@ UserLoyaltyEnrollment.belongsTo(LoyaltyProgram, {
   as: 'loyaltyProgram',
 });
 
-// =====================================================
 // LOYALTY PROGRAM <-> PIN
-// =====================================================
 
 LoyaltyProgram.hasMany(LoyaltyProgramPin, {
   foreignKey: 'loyaltyProgramId',
@@ -159,9 +155,7 @@ LoyaltyProgramPin.belongsTo(User, {
   as: 'vendor',
 });
 
-// =====================================================
 // USER <-> LOYALTY SCANS
-// =====================================================
 
 User.hasMany(LoyaltyScan, {
   foreignKey: 'userId',

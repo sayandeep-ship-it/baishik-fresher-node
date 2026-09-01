@@ -10,9 +10,7 @@ const LoyaltyProgram = sequelize.define(
       autoIncrement: true,
     },
 
-    // =================================================
     // VENDOR
-    // =================================================
 
     vendorId: {
       type: DataTypes.INTEGER,
@@ -20,18 +18,14 @@ const LoyaltyProgram = sequelize.define(
       field: 'vendor_id',
     },
 
-    // =================================================
     // IMAGE
-    // =================================================
 
     image: {
       type: DataTypes.STRING(500),
       allowNull: true,
     },
 
-    // =================================================
     // BASIC PROGRAM INFORMATION
-    // =================================================
 
     programName: {
       type: DataTypes.STRING(255),
@@ -45,9 +39,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'required_star_collection',
     },
 
-    // =================================================
     // QR CODE SCAN INTERVAL
-    // =================================================
 
     qrCodeScanIntervalValue: {
       type: DataTypes.INTEGER,
@@ -61,9 +53,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'qr_code_scan_interval_unit',
     },
 
-    // =================================================
     // PROGRAM RULES
-    // =================================================
 
     programRules: {
       type: DataTypes.TEXT,
@@ -71,9 +61,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'program_rules',
     },
 
-    // =================================================
     // NOTIFICATION
-    // =================================================
 
     notificationEnabled: {
       type: DataTypes.BOOLEAN,
@@ -90,21 +78,12 @@ const LoyaltyProgram = sequelize.define(
       field: 'notification_star_field',
     },
 
-    // Example:
-    // LESS_THAN
-    // GREATER_THAN
-    // EQUAL_TO
     notificationConditionOperator: {
       type: DataTypes.ENUM('LESS_THAN', 'GREATER_THAN', 'EQUAL_TO', 'LESS_THAN_OR_EQUAL', 'GREATER_THAN_OR_EQUAL'),
       allowNull: true,
       field: 'notification_condition_operator',
     },
 
-    // Example:
-    // EQUAL_TO
-    // NOT_EQUAL_TO
-    // LESS_THAN
-    // GREATER_THAN
     notificationComparisonOperator: {
       type: DataTypes.ENUM(
         'EQUAL_TO',
@@ -140,9 +119,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'notification_template',
     },
 
-    // =================================================
     // PROGRAM STATUS
-    // =================================================
 
     isActive: {
       type: DataTypes.BOOLEAN,
@@ -150,11 +127,9 @@ const LoyaltyProgram = sequelize.define(
       defaultValue: true,
       field: 'is_active',
     },
-    // =================================================
     // QR CODE + PIN VERIFICATION
-    // =================================================
 
-    // New canonical flag.
+    // New hasPin flag.
     hasPin: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -177,9 +152,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'qr_code_image',
     },
 
-    // =================================================
     // PIN VERIFICATION (backward-compatible alias)
-    // =================================================
 
     enablePinVerification: {
       type: DataTypes.BOOLEAN,

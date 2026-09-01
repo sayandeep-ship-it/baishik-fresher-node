@@ -13,27 +13,12 @@ router.post('/login', adminController.login);
 router.get('/me', authenticate, authorizeSuperadmin, adminController.getMe);
 
 // PROMOTE USER TO VENDOR
-router.post(
-  '/users/:userId/vendor',
-  authenticate,
-  authorizeSuperadmin,
-  adminController.appointVendor
-);
+router.post('/users/:userId/vendor', authenticate, authorizeSuperadmin, adminController.appointVendor);
 
 // SUSPEND VENDOR
-router.patch(
-  '/users/:userId/vendor/suspend',
-  authenticate,
-  authorizeSuperadmin,
-  adminController.suspendVendor
-);
+router.patch('/users/:userId/vendor/suspend', authenticate, authorizeSuperadmin, adminController.suspendVendor);
 
 // ACTIVATE VENDOR
-router.patch(
-  '/users/:userId/vendor/activate',
-  authenticate,
-  authorizeSuperadmin,
-  adminController.activateVendor
-);
+router.patch('/users/:userId/vendor/activate', authenticate, authorizeSuperadmin, adminController.activateVendor);
 
 module.exports = router;

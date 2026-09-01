@@ -69,20 +69,10 @@ router.post('/loyalty-programs/:programId/enroll', authenticate, authorizeUser, 
 // Uses the authenticated current user from the same JWT identity used by /me.
 // GET /me remains read-only.
 
-router.post(
-  '/me/loyalty-programs/scan',
-  authenticate,
-  authorizeUser,
-  userController.scanLoyaltyQr
-);
+router.post('/me/loyalty-programs/scan', authenticate, authorizeUser, userController.scanLoyaltyQr);
 
 // VERIFY VENDOR-GENERATED PIN AFTER A PIN-PROTECTED QR SCAN
 
-router.post(
-  '/me/loyalty-programs/verify-pin',
-  authenticate,
-  authorizeUser,
-  userController.verifyLoyaltyPin
-);
+router.post('/me/loyalty-programs/verify-pin', authenticate, authorizeUser, userController.verifyLoyaltyPin);
 
 module.exports = router;

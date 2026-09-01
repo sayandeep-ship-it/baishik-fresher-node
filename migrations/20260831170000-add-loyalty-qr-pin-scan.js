@@ -8,12 +8,6 @@ module.exports = {
     const tableName = 'loyalty_programs';
     let table = await queryInterface.describeTable(tableName);
 
-    // -------------------------------------------------
-    // Add QR columns as nullable first so an existing
-    // production/development database can be migrated
-    // without failing on rows that already exist.
-    // -------------------------------------------------
-
     if (!table.qr_code_token) {
       await queryInterface.addColumn(tableName, 'qr_code_token', {
         type: Sequelize.STRING(128),
@@ -35,12 +29,6 @@ module.exports = {
         defaultValue: false,
       });
     }
-
-    // -------------------------------------------------
-    // Backfill QR data for existing loyalty programs.
-    // This guarantees every existing program also gets
-    // a usable QR code.
-    // -------------------------------------------------
 
     const [programs] = await queryInterface.sequelize.query(
       `SELECT id, qr_code_token, qr_code_image FROM ${tableName}`
@@ -74,10 +62,7 @@ module.exports = {
         }
       );
     }
-
-    // -------------------------------------------------
     // Make QR fields mandatory after backfill.
-    // -------------------------------------------------
 
     table = await queryInterface.describeTable(tableName);
 
@@ -91,9 +76,7 @@ module.exports = {
       allowNull: false,
     });
 
-    // -------------------------------------------------
     // Unique QR token index
-    // -------------------------------------------------
 
     const indexes = await queryInterface.showIndex(tableName);
 
@@ -104,14 +87,10 @@ module.exports = {
       });
     }
 
-    // -------------------------------------------------
     // PIN table
-    // -------------------------------------------------
 
     const tables = await queryInterface.showAllTables();
-    const normalizedTables = tables.map((value) =>
-      typeof value === 'object' ? value.tableName || value : value
-    );
+    const normalizedTables = tables.map((value) => (typeof value === 'object' ? value.tableName || value : value));
 
     if (!normalizedTables.includes('loyalty_program_pins')) {
       await queryInterface.createTable('loyalty_program_pins', {
@@ -180,9 +159,7 @@ module.exports = {
       });
     }
 
-    // -------------------------------------------------
     // Scan table
-    // -------------------------------------------------
 
     if (!normalizedTables.includes('loyalty_scans')) {
       await queryInterface.createTable('loyalty_scans', {
@@ -245,13 +222,9 @@ module.exports = {
         },
       });
 
-      await queryInterface.addIndex(
-        'loyalty_scans',
-        ['user_id', 'loyalty_program_id', 'scanned_at'],
-        {
-          name: 'loyalty_scans_user_program_time_index',
-        }
-      );
+      await queryInterface.addIndex('loyalty_scans', ['user_id', 'loyalty_program_id', 'scanned_at'], {
+        name: 'loyalty_scans_user_program_time_index',
+      });
 
       await queryInterface.addIndex('loyalty_scans', ['status'], {
         name: 'loyalty_scans_status_index',
@@ -261,9 +234,7 @@ module.exports = {
 
   async down(queryInterface) {
     const tables = await queryInterface.showAllTables();
-    const normalizedTables = tables.map((value) =>
-      typeof value === 'object' ? value.tableName || value : value
-    );
+    const normalizedTables = tables.map((value) => (typeof value === 'object' ? value.tableName || value : value));
 
     if (normalizedTables.includes('loyalty_scans')) {
       await queryInterface.dropTable('loyalty_scans');
