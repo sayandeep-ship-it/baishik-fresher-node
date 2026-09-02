@@ -48,7 +48,11 @@ const LoyaltyProgram = sequelize.define(
     },
 
     qrCodeScanIntervalUnit: {
-      type: DataTypes.ENUM('MINUTES', 'HOURS', 'DAYS'),
+      type: DataTypes.ENUM(
+        'MINUTES',
+        'HOURS',
+        'DAYS'
+      ),
       allowNull: false,
       field: 'qr_code_scan_interval_unit',
     },
@@ -71,6 +75,7 @@ const LoyaltyProgram = sequelize.define(
     },
 
     // "If No. of Star"
+
     notificationStarField: {
       type: DataTypes.STRING(50),
       allowNull: true,
@@ -79,7 +84,13 @@ const LoyaltyProgram = sequelize.define(
     },
 
     notificationConditionOperator: {
-      type: DataTypes.ENUM('LESS_THAN', 'GREATER_THAN', 'EQUAL_TO', 'LESS_THAN_OR_EQUAL', 'GREATER_THAN_OR_EQUAL'),
+      type: DataTypes.ENUM(
+        'LESS_THAN',
+        'GREATER_THAN',
+        'EQUAL_TO',
+        'LESS_THAN_OR_EQUAL',
+        'GREATER_THAN_OR_EQUAL'
+      ),
       allowNull: true,
       field: 'notification_condition_operator',
     },
@@ -98,6 +109,7 @@ const LoyaltyProgram = sequelize.define(
     },
 
     // "Required Star"
+
     notificationComparisonValue: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -105,6 +117,7 @@ const LoyaltyProgram = sequelize.define(
     },
 
     // "Send Notification"
+
     notificationAction: {
       type: DataTypes.STRING(100),
       allowNull: true,
@@ -113,6 +126,7 @@ const LoyaltyProgram = sequelize.define(
     },
 
     // "Select Template"
+
     notificationTemplate: {
       type: DataTypes.STRING(255),
       allowNull: true,
@@ -127,9 +141,9 @@ const LoyaltyProgram = sequelize.define(
       defaultValue: true,
       field: 'is_active',
     },
+
     // QR CODE + PIN VERIFICATION
 
-    // New hasPin flag.
     hasPin: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -137,7 +151,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'has_pin',
     },
 
-    // Unique server-side value embedded in the QR payload.
+   
     qrCodeToken: {
       type: DataTypes.STRING(128),
       allowNull: false,
@@ -145,15 +159,7 @@ const LoyaltyProgram = sequelize.define(
       field: 'qr_code_token',
     },
 
-    // Generated QR image as a data URL.
-    qrCodeImage: {
-      type: DataTypes.TEXT('long'),
-      allowNull: false,
-      field: 'qr_code_image',
-    },
-
-    // PIN VERIFICATION (backward-compatible alias)
-
+    
     enablePinVerification: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

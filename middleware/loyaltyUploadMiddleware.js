@@ -30,11 +30,31 @@ const storage = multer.diskStorage({
 
 // FILE VALIDATION
 
-const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+const allowedMimeTypes = [
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+  'image/png',
+  'image/x-png',
+  'image/webp',
+];
 
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    return cb(new Error('Only JPG, JPEG, PNG and WEBP images are allowed.'));
+const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+
+const fileFilter = (req, file, cb) => {
+  const extension = path.extname(file.originalname || '').toLowerCase();
+  const mimeType = (file.mimetype || '').toLowerCase();
+
+  const isExtensionValid = allowedExtensions.includes(extension);
+  const isMimeTypeValid =
+    allowedMimeTypes.includes(mimeType) ||
+    (mimeType === 'application/octet-stream' && isExtensionValid);
+
+  if (!isExtensionValid || !isMimeTypeValid) {
+    const error = new Error('Only JPG, JPEG, PNG and WEBP images are allowed.');
+    error.status = 400;
+    error.statusCode = 400;
+    return cb(error);
   }
 
   cb(null, true);
@@ -55,3 +75,4 @@ const uploadLoyaltyImage = multer({
 // EXPORT
 
 module.exports = uploadLoyaltyImage;
+

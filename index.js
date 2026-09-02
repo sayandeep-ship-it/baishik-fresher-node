@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
+const multer = require('multer');
 
 require('dotenv').config();
 
@@ -68,6 +69,29 @@ app.use((req, res) => {
 // ERROR
 
 app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        message: 'File size too large. Maximum allowed size is 5MB.',
+      });
+    }
+
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+
+  if (
+    err &&
+    (err.status === 400 ||
+      err.statusCode === 400 ||
+      err.message === 'Only JPG, JPEG, PNG and WEBP images are allowed.')
+  ) {
+    return res.status(err.status || err.statusCode || 400).json({
+      message: err.message,
+    });
+  }
+
   console.error(err);
 
   res.status(500).json({
