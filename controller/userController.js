@@ -538,6 +538,23 @@ exports.enrollLoyaltyProgram = async (req, res) => {
       redeemedStars: 0,
     });
 
+    const existingVendorEnrollment = await UserVendorEnrollment.findOne({
+      where: {
+        userId: req.user.id,
+        vendorId: program.vendorId,
+      },
+    });
+
+    if (!existingVendorEnrollment) {
+      await UserVendorEnrollment.create({
+        userId: req.user.id,
+        vendorId: program.vendorId,
+        starsCollected: 0,
+        pendingStars: 0,
+        redeemedStars: 0,
+      });
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Loyalty program enrollment successful.',
@@ -948,14 +965,14 @@ exports.scanLoyaltyQr = async (req, res) => {
       });
     }
 
-    // No PIN required: award exactly one star atomically.
+    // No PIN required: award stars atomically based on the program's configured value.
     const transaction = await sequelize.transaction();
 
     try {
-      const lockedEnrollment = await UserLoyaltyEnrollment.findOne({
+      const lockedEnrollment = await UserVendorEnrollment.findOne({
         where: {
           userId: req.user.id,
-          loyaltyProgramId: program.id,
+          vendorId: program.vendorId,
         },
         transaction,
         lock: transaction.LOCK.UPDATE,
@@ -964,7 +981,7 @@ exports.scanLoyaltyQr = async (req, res) => {
       if (!lockedEnrollment) {
         await transaction.rollback();
         return res.status(403).json({
-          message: 'You must enroll in this loyalty program before collecting stars.',
+          message: 'Vendor enrollment record not found. Please enroll in a program first.',
         });
       }
 
@@ -985,8 +1002,10 @@ exports.scanLoyaltyQr = async (req, res) => {
         });
       }
 
-      lockedEnrollment.starsCollected += 1;
-      lockedEnrollment.pendingStars += 1;
+      const starsToAward = program.awardedStarsPerScan || 1;
+
+      lockedEnrollment.starsCollected += starsToAward;
+      lockedEnrollment.pendingStars += starsToAward;
       await lockedEnrollment.save({ transaction });
 
       await LoyaltyScan.create(
@@ -994,7 +1013,7 @@ exports.scanLoyaltyQr = async (req, res) => {
           userId: req.user.id,
           loyaltyProgramId: program.id,
           status: 'AWARDED',
-          starsAwarded: 1,
+          starsAwarded: starsToAward,
           pinVerified: false,
           scannedAt: new Date(),
           verifiedAt: null,
@@ -1008,7 +1027,7 @@ exports.scanLoyaltyQr = async (req, res) => {
         success: true,
         starAwarded: true,
         requiresPin: false,
-        starsAwarded: 1,
+        starsAwarded: starsToAward,
         pendingStars: lockedEnrollment.pendingStars,
         totalStarsCollected: lockedEnrollment.starsCollected,
         loyaltyProgramId: program.id,
@@ -1082,16 +1101,16 @@ exports.verifyLoyaltyPin = async (req, res) => {
       });
     }
 
-    const enrollment = await UserLoyaltyEnrollment.findOne({
+    const enrollment = await UserVendorEnrollment.findOne({
       where: {
         userId: req.user.id,
-        loyaltyProgramId: program.id,
+        vendorId: program.vendorId,
       },
     });
 
     if (!enrollment) {
       return res.status(403).json({
-        message: 'You must be enrolled in this loyalty program.',
+        message: 'Vendor enrollment record not found. Please enroll in a program first.',
       });
     }
 
@@ -1127,10 +1146,10 @@ exports.verifyLoyaltyPin = async (req, res) => {
         });
       }
 
-      const lockedEnrollment = await UserLoyaltyEnrollment.findOne({
+      const lockedEnrollment = await UserVendorEnrollment.findOne({
         where: {
           userId: req.user.id,
-          loyaltyProgramId: program.id,
+          vendorId: program.vendorId,
         },
         transaction,
         lock: transaction.LOCK.UPDATE,
@@ -1139,7 +1158,7 @@ exports.verifyLoyaltyPin = async (req, res) => {
       if (!lockedEnrollment) {
         await transaction.rollback();
         return res.status(403).json({
-          message: 'You must be enrolled in this loyalty program.',
+          message: 'Vendor enrollment record not found.',
         });
       }
 
@@ -1200,12 +1219,14 @@ exports.verifyLoyaltyPin = async (req, res) => {
       pinRecord.usedAt = new Date();
       await pinRecord.save({ transaction });
 
-      lockedEnrollment.starsCollected += 1;
-      lockedEnrollment.pendingStars += 1;
+      const starsToAward = program.awardedStarsPerScan || 1;
+
+      lockedEnrollment.starsCollected += starsToAward;
+      lockedEnrollment.pendingStars += starsToAward;
       await lockedEnrollment.save({ transaction });
 
       lockedScan.status = 'AWARDED';
-      lockedScan.starsAwarded = 1;
+      lockedScan.starsAwarded = starsToAward;
       lockedScan.pinVerified = true;
       lockedScan.verifiedAt = new Date();
       await lockedScan.save({ transaction });

@@ -166,6 +166,29 @@ const LoyaltyProgram = sequelize.define(
       defaultValue: false,
       field: 'enable_pin_verification',
     },
+
+    // QR CODE INFO
+
+    qrCodePath: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: 'qr_code_path',
+    },
+
+    qrCodeUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: 'qr_code_url',
+    },
+
+    // REWARD CONFIGURATION
+
+    awardedStarsPerScan: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: 'awarded_stars_per_scan',
+    },
   },
   {
     tableName: 'loyalty_programs',

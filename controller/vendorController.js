@@ -965,6 +965,7 @@ exports.createLoyaltyProgram = async (
       qrCodeScanIntervalUnit,
       programRules,
       enablePinVerification,
+      awardedStarsPerScan,
     } = req.body || {};
 
     const vendorId = req.user.id;
@@ -1166,6 +1167,9 @@ exports.createLoyaltyProgram = async (
           enablePinVerification: hasPin,
           hasPin,
           qrCodeToken,
+          qrCodePath: qrCodeFilePath,
+          qrCodeUrl: qrCodeUrl,
+          awardedStarsPerScan: awardedStarsPerScan ? Number(awardedStarsPerScan) : 1,
           isActive: false,
         });
 
@@ -1921,3 +1925,99 @@ exports.updateProfile =
       });
     }
   };
+
+// =====================================================
+// GET ENROLLED USERS FOR VENDOR
+// =====================================================
+
+exports.getVendorEnrollments = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const enrollments = await UserVendorEnrollment.findAll({
+      where: { vendorId },
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'lastName', 'email', 'phone'],
+        },
+      ],
+    });
+
+    return res.status(200).json({
+      success: true,
+      enrollments,
+    });
+  } catch (error) {
+    console.error('Error fetching vendor enrollments:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// =====================================================
+// REDEEM LOYALTY STARS
+// =====================================================
+
+exports.redeemLoyaltyProgram = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    const { programId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    const program = await LoyaltyProgram.findOne({
+      where: { id: programId, vendorId, isActive: true },
+    });
+
+    if (!program) {
+      return res.status(404).json({ message: 'Active loyalty program not found' });
+    }
+
+    const transaction = await sequelize.transaction();
+
+    try {
+      const enrollment = await UserVendorEnrollment.findOne({
+        where: { userId, vendorId },
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+
+      if (!enrollment) {
+        await transaction.rollback();
+        return res.status(404).json({ message: 'User is not enrolled with this vendor' });
+      }
+
+      if (enrollment.pendingStars < program.requiredStarCollection) {
+        await transaction.rollback();
+        return res.status(400).json({ 
+          message: 'Not enough stars to redeem this offer',
+          required: program.requiredStarCollection,
+          available: enrollment.pendingStars 
+        });
+      }
+
+      enrollment.pendingStars -= program.requiredStarCollection;
+      enrollment.redeemedStars += program.requiredStarCollection;
+
+      await enrollment.save({ transaction });
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Offer redeemed successfully',
+        remainingStars: enrollment.pendingStars,
+      });
+
+    } catch (txError) {
+      await transaction.rollback();
+      throw txError;
+    }
+
+  } catch (error) {
+    console.error('Error redeeming offer:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};

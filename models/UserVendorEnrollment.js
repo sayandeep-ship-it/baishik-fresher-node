@@ -28,6 +28,20 @@ const UserVendorEnrollment = sequelize.define(
       defaultValue: 0,
       field: 'stars_collected',
     },
+
+    pendingStars: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'pending_stars',
+    },
+
+    redeemedStars: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'redeemed_stars',
+    },
   },
   {
     tableName: 'user_vendor_enrollments',

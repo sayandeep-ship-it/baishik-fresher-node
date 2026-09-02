@@ -86,4 +86,17 @@ router.patch(
   vendorController.deactivateLoyaltyProgram
 );
 
+// GET ALL USERS ENROLLED WITH THIS VENDOR
+
+router.get('/enrollments', authenticate, authorizeVendor, vendorController.getVendorEnrollments);
+
+// REDEEM LOYALTY PROGRAM OFFER FOR A USER
+
+router.post(
+  '/loyalty-programs/:programId/redeem',
+  authenticate,
+  authorizeVendor,
+  vendorController.redeemLoyaltyProgram
+);
+
 module.exports = router;
