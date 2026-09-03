@@ -790,8 +790,8 @@ const toLoyaltyProgramResponse = (
     ...data,
     ...(qrCodeUrl
       ? {
-          qrCodeUrl,
-        }
+        qrCodeUrl,
+      }
       : {}),
   };
 };
@@ -897,7 +897,7 @@ const validateNotificationSettings = (body) => {
 
   if (
     notificationComparisonValue ===
-      undefined ||
+    undefined ||
     notificationComparisonValue === null ||
     notificationComparisonValue === ''
   ) {
@@ -978,7 +978,7 @@ exports.createLoyaltyProgram = async (
 
     if (
       requiredStarCollection ===
-        undefined ||
+      undefined ||
       requiredStarCollection === null ||
       requiredStarCollection === ''
     ) {
@@ -990,7 +990,7 @@ exports.createLoyaltyProgram = async (
 
     if (
       qrCodeScanIntervalValue ===
-        undefined ||
+      undefined ||
       qrCodeScanIntervalValue === null ||
       qrCodeScanIntervalValue === ''
     ) {
@@ -1090,7 +1090,7 @@ exports.createLoyaltyProgram = async (
     const trimmedProgramName =
       String(programName).trim();
 
-    
+
     const qrCodeToken =
       crypto.randomBytes(32).toString('hex');
 
@@ -1100,7 +1100,7 @@ exports.createLoyaltyProgram = async (
       hasPin,
     });
 
-    
+
     const qrCodeFileName =
       getQrCodeFileName(
         trimmedProgramName,
@@ -1118,10 +1118,10 @@ exports.createLoyaltyProgram = async (
     let qrCodeFileCreated = false;
 
     try {
-    
+
       await ensureQrCodeDirectory();
 
-      
+
       await QRCode.toFile(
         qrCodeFilePath,
         qrPayload,
@@ -1135,7 +1135,7 @@ exports.createLoyaltyProgram = async (
 
       qrCodeFileCreated = true;
 
-    
+
       const loyaltyProgram =
         await LoyaltyProgram.create({
           vendorId,
@@ -1188,7 +1188,7 @@ exports.createLoyaltyProgram = async (
         },
       });
     } catch (creationError) {
-      
+
       if (qrCodeFileCreated) {
         try {
           await fs.promises.unlink(
@@ -1596,15 +1596,15 @@ exports.generateLoyaltyPin =
       const expiryMinutes =
         Number(
           process.env.LOYALTY_PIN_EXPIRY_MINUTES ||
-            5
+          5
         );
 
       const expiresAt =
         new Date(
           Date.now() +
-            expiryMinutes *
-              60 *
-              1000
+          expiryMinutes *
+          60 *
+          1000
         );
 
       // Revoke every previous unused PIN
@@ -1774,33 +1774,33 @@ exports.getProfile =
           vendorDetails:
             vendorDetails
               ? {
-                  hasAddress:
-                    vendorDetails.hasAddress,
+                hasAddress:
+                  vendorDetails.hasAddress,
 
-                  streetAddress:
-                    vendorDetails.streetAddress,
+                streetAddress:
+                  vendorDetails.streetAddress,
 
-                  city:
-                    vendorDetails.city,
+                city:
+                  vendorDetails.city,
 
-                  country:
-                    vendorDetails.country,
+                country:
+                  vendorDetails.country,
 
-                  state:
-                    vendorDetails.state,
+                state:
+                  vendorDetails.state,
 
-                  pinCode:
-                    vendorDetails.pinCode,
+                pinCode:
+                  vendorDetails.pinCode,
 
-                  storeName:
-                    vendorDetails.storeName,
+                storeName:
+                  vendorDetails.storeName,
 
-                  storeType:
-                    vendorDetails.storeType,
+                storeType:
+                  vendorDetails.storeType,
 
-                  image:
-                    vendorDetails.image,
-                }
+                image:
+                  vendorDetails.image,
+              }
               : null,
         },
       });
@@ -1992,10 +1992,10 @@ exports.redeemLoyaltyProgram = async (req, res) => {
 
       if (enrollment.pendingStars < program.requiredStarCollection) {
         await transaction.rollback();
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'Not enough stars to redeem this offer',
           required: program.requiredStarCollection,
-          available: enrollment.pendingStars 
+          available: enrollment.pendingStars
         });
       }
 

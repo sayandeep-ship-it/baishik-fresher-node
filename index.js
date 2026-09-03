@@ -16,6 +16,8 @@ require('./models');
 
 const apiRoutes = require('./routes/api');
 
+const { startNotificationCron } = require('./cron/notificationCron');
+
 const app = express();
 
 // MIDDLEWARE
@@ -113,6 +115,9 @@ const startServer = async () => {
 
     app.listen(PORT, HOST, () => {
       console.log(`Server running at http://${HOST}:${PORT}`);
+
+      // Start the notification cron job
+      startNotificationCron();
     });
   } catch (error) {
     console.error('Unable to start server:', error.message);

@@ -9,6 +9,7 @@ const UserVendorEnrollment = require('./UserVendorEnrollment');
 const UserLoyaltyEnrollment = require('./UserLoyaltyEnrollment');
 const LoyaltyProgramPin = require('./LoyaltyProgramPin');
 const LoyaltyScan = require('./LoyaltyScan');
+const UserNotification = require('./UserNotification');
 
 // USER <-> ROLE
 
@@ -179,6 +180,35 @@ LoyaltyScan.belongsTo(LoyaltyProgram, {
   as: 'loyaltyProgram',
 });
 
+// USER <-> NOTIFICATIONS
+
+User.hasMany(UserNotification, {
+  foreignKey: 'userId',
+  as: 'notifications',
+  onDelete: 'CASCADE',
+});
+
+UserNotification.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+LoyaltyProgram.hasMany(UserNotification, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'notifications',
+  onDelete: 'CASCADE',
+});
+
+UserNotification.belongsTo(LoyaltyProgram, {
+  foreignKey: 'loyaltyProgramId',
+  as: 'loyaltyProgram',
+});
+
+UserNotification.belongsTo(User, {
+  foreignKey: 'vendorId',
+  as: 'vendor',
+});
+
 module.exports = {
   sequelize,
   User,
@@ -190,4 +220,5 @@ module.exports = {
   UserLoyaltyEnrollment,
   LoyaltyProgramPin,
   LoyaltyScan,
+  UserNotification,
 };

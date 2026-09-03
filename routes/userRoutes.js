@@ -8,6 +8,8 @@ const authController = require('../controller/authController');
 
 const userController = require('../controller/userController');
 
+const notificationController = require('../controller/notificationController');
+
 // MIDDLEWARE
 
 const authenticate = require('../middleware/authMiddleware');
@@ -74,5 +76,13 @@ router.post('/me/loyalty-programs/scan', authenticateUserOr404, userController.s
 // VERIFY VENDOR-GENERATED PIN AFTER A PIN-PROTECTED QR SCAN
 
 router.post('/me/loyalty-programs/verify-pin', authenticateUserOr404, userController.verifyLoyaltyPin);
+
+// USER NOTIFICATIONS
+
+router.get('/notifications', authenticate, authorizeUser, notificationController.getUserNotifications);
+
+// MARK NOTIFICATION AS READ
+
+router.patch('/notifications/:id/read', authenticate, authorizeUser, notificationController.markNotificationRead);
 
 module.exports = router;
